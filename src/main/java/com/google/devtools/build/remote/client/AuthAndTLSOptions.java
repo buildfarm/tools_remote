@@ -49,13 +49,7 @@ public final class AuthAndTLSOptions {
   )
   public String googleCredentials = null;
 
-  @Parameter(
-    names = "--tls_enabled",
-    arity = 1,
-    description =
-        "Specifies whether to use TLS for remote execution/caching and the build event service"
-            + " (BES)."
-  )
+  @Parameter(names = "--tls_enabled", arity = 1, description = "Specifies whether to use TLS.")
   public boolean tlsEnabled = false;
 
   @Parameter(

@@ -14,11 +14,16 @@
 
 package com.google.devtools.build.remote.client;
 
+import static com.google.common.io.MoreFiles.asByteSource;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import com.google.common.hash.HashCode;
 import com.google.common.hash.HashFunction;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.protobuf.Message;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 public class DigestUtil {
   private final HashFunction hashFn;
@@ -44,7 +49,23 @@ public class DigestUtil {
     return compute(str.getBytes(UTF_8));
   }
 
+  public Digest compute(Path path) throws IOException {
+    if (!Files.isRegularFile(path)) {
+      throw new IOException("Only can compute hash for regular file.");
+    }
+    long fileSize = Files.size(path);
+    return buildDigest(asByteSource(path).hash(hashFn).asBytes(), fileSize);
+  }
+
+  public static Digest buildDigest(byte[] hash, long size) {
+    return buildDigest(HashCode.fromBytes(hash).toString(), size);
+  }
+
   public static Digest buildDigest(String hexHash, long size) {
     return Digest.newBuilder().setHash(hexHash).setSizeBytes(size).build();
+  }
+
+  public String toString(Digest digest) {
+    return digest.getHash() + "/" + digest.getSizeBytes();
   }
 }

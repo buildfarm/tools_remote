@@ -1,6 +1,6 @@
 java_test(
     name = "GrpcRemoteCacheTest",
-    srcs = ["GrpcRemoteCacheTest.java"],
+    srcs = glob(["*.java"]),
     deps = [
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/http_client:google_http_client",
@@ -14,6 +14,7 @@ java_test(
         "//src/main/java/com/google/devtools/build/remote/client",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
+        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_proto",
     ],
