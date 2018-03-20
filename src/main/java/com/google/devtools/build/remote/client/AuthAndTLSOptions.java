@@ -49,7 +49,7 @@ public final class AuthAndTLSOptions {
   )
   public String googleCredentials = null;
 
-  @Parameter(names = "--tls_enabled", arity = 1, description = "Specifies whether to use TLS.")
+  @Parameter(names = "--tls_enabled", description = "Specifies whether to use TLS.")
   public boolean tlsEnabled = false;
 
   @Parameter(

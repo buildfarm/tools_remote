@@ -91,7 +91,12 @@ public class GrpcRemoteCache extends AbstractRemoteActionCache {
    */
   @Override
   public Tree getTree(Digest rootDigest) throws IOException {
-    Directory dir = Directory.parseFrom(downloadBlob(rootDigest));
+    Directory dir;
+    try {
+      dir = Directory.parseFrom(downloadBlob(rootDigest));
+    } catch (IOException e) {
+      throw new IOException("Failed to download root Directory of tree.", e);
+    }
     Tree.Builder result = Tree.newBuilder().setRoot(dir);
     GetTreeResponse response = null;
     while (response == null || !response.getNextPageToken().isEmpty()) {

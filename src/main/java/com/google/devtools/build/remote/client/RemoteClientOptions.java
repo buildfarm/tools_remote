@@ -37,15 +37,36 @@ public final class RemoteClientOptions {
   )
   public static class LsCommand {
     @Parameter(
-      names = "--digest",
+      names = { "--digest", "-d" },
+      required = true,
       converter = DigestConverter.class,
       description = "The digest of the Directory to list in hex_hash/size_bytes."
     )
     public Digest digest = null;
 
     @Parameter(
-      names = "--limit",
-      description = "The maximum number of files in a directory to list."
+      names = { "--limit", "-l" },
+      description = "The maximum number of files in the Directory to list."
+    )
+    public int limit = 100;
+  }
+
+  @Parameters(
+    commandDescription = "Recursively lists an OutputDirectory in remote cache.",
+    separators = "="
+  )
+  public static class LsOutDirCommand {
+    @Parameter(
+      names = { "--digest", "-d" },
+      required = true,
+      converter = DigestConverter.class,
+      description = "The digest of the OutputDirectory to list in hex_hash/size_bytes."
+    )
+    public Digest digest = null;
+
+    @Parameter(
+      names = { "--limit", "-l" },
+      description = "The maximum number of files in the OutputDirectory to list."
     )
     public int limit = 100;
   }
@@ -56,16 +77,38 @@ public final class RemoteClientOptions {
   )
   public static class GetDirCommand {
     @Parameter(
-      names = "--digest",
+      names = { "--digest", "-d" },
+      required = true,
       converter = DigestConverter.class,
       description = "The digest of the Directory to download in hex_hash/size_bytes."
     )
     public Digest digest = null;
 
     @Parameter(
-      names = "--path",
+      names = { "--path", "-o" },
       converter = PathConverter.class,
       description = "The local path to download the Directory contents into."
+    )
+    public Path path = Paths.get("");
+  }
+
+  @Parameters(
+    commandDescription = "Recursively downloads a OutputDirectory from remote cache.",
+    separators = "="
+  )
+  public static class GetOutDirCommand {
+    @Parameter(
+      names = { "--digest", "-d" },
+      required = true,
+      converter = DigestConverter.class,
+      description = "The digest of the OutputDirectory to download in hex_hash/size_bytes."
+    )
+    public Digest digest = null;
+
+    @Parameter(
+      names = { "--path", "-o" },
+      converter = PathConverter.class,
+      description = "The local path to download the OutputDirectory contents into."
     )
     public Path path = Paths.get("");
   }
@@ -78,14 +121,15 @@ public final class RemoteClientOptions {
   )
   public static class CatCommand {
     @Parameter(
-      names = "--digest",
+      names = { "--digest", "-d" },
+      required = true,
       converter = DigestConverter.class,
       description = "The digest in the format hex_hash/size_bytes of the blob to download."
     )
     public Digest digest = null;
 
     @Parameter(
-      names = "--file",
+      names = { "--file", "-o" },
       converter = FileConverter.class,
       description = "Specifies a file to write the blob contents to instead of stdout."
     )

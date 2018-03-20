@@ -34,6 +34,7 @@ import com.google.devtools.remoteexecution.v1test.DirectoryNode;
 import com.google.devtools.remoteexecution.v1test.FileNode;
 import com.google.devtools.remoteexecution.v1test.GetTreeRequest;
 import com.google.devtools.remoteexecution.v1test.GetTreeResponse;
+import com.google.devtools.remoteexecution.v1test.OutputDirectory;
 import com.google.devtools.remoteexecution.v1test.RequestMetadata;
 import com.google.devtools.remoteexecution.v1test.ToolDetails;
 import com.google.devtools.remoteexecution.v1test.Tree;
@@ -47,7 +48,6 @@ import io.grpc.ClientInterceptors;
 import io.grpc.Context;
 import io.grpc.MethodDescriptor;
 import io.grpc.Server;
-import io.grpc.Status;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
@@ -311,5 +311,118 @@ public class GrpcRemoteCacheTest {
     Tree tree = client.getTree(fooDigest);
     assertThat(tree.getRoot()).isEqualTo(fooMessage);
     assertThat(tree.getChildrenList()).containsExactly(quxMessage, barMessage);
+  }
+
+  @Test
+  public void testDownloadOutputDirectory() throws Exception {
+    GrpcRemoteCache client = newClient();
+    Digest fooDigest = DIGEST_UTIL.computeAsUtf8("foo-contents");
+    Digest quxDigest = DIGEST_UTIL.computeAsUtf8("qux-contents");
+    Tree barTreeMessage =
+        Tree.newBuilder()
+            .setRoot(
+                Directory.newBuilder()
+                    .addFiles(
+                        FileNode.newBuilder()
+                            .setName("qux")
+                            .setDigest(quxDigest)
+                            .setIsExecutable(true)))
+            .build();
+    Digest barTreeDigest = DIGEST_UTIL.compute(barTreeMessage);
+    OutputDirectory barDirMessage =
+        OutputDirectory.newBuilder().setPath("test/bar").setTreeDigest(barTreeDigest).build();
+    Digest barDirDigest = DIGEST_UTIL.compute(barDirMessage);
+    serviceRegistry.addService(
+        new FakeImmutableCacheByteStreamImpl(
+            ImmutableMap.of(
+                fooDigest,
+                "foo-contents",
+                barTreeDigest,
+                barTreeMessage.toByteString(),
+                quxDigest,
+                "qux-contents",
+                barDirDigest,
+                barDirMessage.toByteString())));
+
+    client.downloadOutputDirectory(barDirMessage, execRoot.resolve("test/bar"));
+
+    assertThat(Files.exists(execRoot.resolve("test/bar"))).isTrue();
+    assertThat(Files.isDirectory(execRoot.resolve("test/bar"))).isTrue();
+    assertThat(Files.exists(execRoot.resolve("test/bar/qux"))).isTrue();
+    assertThat(Files.isRegularFile(execRoot.resolve("test/bar/qux"))).isTrue();
+    assertThat(isExecutable(execRoot.resolve("test/bar/qux"))).isTrue();
+  }
+
+  @Test
+  public void testDownloadOutputDirectoryEmpty() throws Exception {
+    GrpcRemoteCache client = newClient();
+
+    Tree barTreeMessage = Tree.newBuilder().setRoot(Directory.newBuilder()).build();
+    Digest barTreeDigest = DIGEST_UTIL.compute(barTreeMessage);
+    OutputDirectory barDirMessage =
+        OutputDirectory.newBuilder().setPath("test/bar").setTreeDigest(barTreeDigest).build();
+    Digest barDirDigest = DIGEST_UTIL.compute(barDirMessage);
+    serviceRegistry.addService(
+        new FakeImmutableCacheByteStreamImpl(
+            ImmutableMap.of(
+                barTreeDigest, barTreeMessage.toByteString(),
+                barDirDigest, barDirMessage.toByteString())));
+
+    client.downloadOutputDirectory(barDirMessage, execRoot.resolve("test/bar"));
+
+    assertThat(Files.exists(execRoot.resolve("test/bar"))).isTrue();
+    assertThat(Files.isDirectory(execRoot.resolve("test/bar"))).isTrue();
+  }
+
+  @Test
+  public void testDownloadOutputDirectoryNested() throws Exception {
+    GrpcRemoteCache client = newClient();
+    Digest fooDigest = DIGEST_UTIL.computeAsUtf8("foo-contents");
+    Digest quxDigest = DIGEST_UTIL.computeAsUtf8("qux-contents");
+    Directory wobbleDirMessage =
+        Directory.newBuilder()
+            .addFiles(FileNode.newBuilder().setName("qux").setDigest(quxDigest))
+            .build();
+    Digest wobbleDigest = DIGEST_UTIL.compute(wobbleDirMessage);
+    Tree barTreeMessage =
+        Tree.newBuilder()
+            .setRoot(
+                Directory.newBuilder()
+                    .addFiles(FileNode.newBuilder().setName("qux").setDigest(quxDigest))
+                    .addDirectories(
+                        DirectoryNode.newBuilder().setName("wobble").setDigest(wobbleDigest)))
+            .addChildren(wobbleDirMessage)
+            .build();
+    Digest barTreeDigest = DIGEST_UTIL.compute(barTreeMessage);
+    OutputDirectory barDirMessage =
+        OutputDirectory.newBuilder().setPath("test/bar").setTreeDigest(barTreeDigest).build();
+    Digest barDirDigest = DIGEST_UTIL.compute(barDirMessage);
+    serviceRegistry.addService(
+        new FakeImmutableCacheByteStreamImpl(
+            ImmutableMap.of(
+                fooDigest,
+                "foo-contents",
+                barTreeDigest,
+                barTreeMessage.toByteString(),
+                quxDigest,
+                "qux-contents",
+                barDirDigest,
+                barDirMessage.toByteString())));
+
+    client.downloadOutputDirectory(barDirMessage, execRoot.resolve("test/bar"));
+
+    assertThat(Files.exists(execRoot.resolve("test/bar"))).isTrue();
+    assertThat(Files.isDirectory(execRoot.resolve("test/bar"))).isTrue();
+
+    assertThat(Files.exists(execRoot.resolve("test/bar/wobble"))).isTrue();
+    assertThat(Files.isDirectory(execRoot.resolve("test/bar/wobble"))).isTrue();
+
+    assertThat(Files.exists(execRoot.resolve("test/bar/wobble/qux"))).isTrue();
+    assertThat(Files.isRegularFile(execRoot.resolve("test/bar/wobble/qux"))).isTrue();
+    assertThat(isExecutable(execRoot.resolve("test/bar/wobble/qux"))).isFalse();
+
+    assertThat(Files.exists(execRoot.resolve("test/bar/qux"))).isTrue();
+    assertThat(Files.isRegularFile(execRoot.resolve("test/bar/qux"))).isTrue();
+    assertThat(isExecutable(execRoot.resolve("test/bar/qux"))).isFalse();
   }
 }

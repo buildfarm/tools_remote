@@ -19,11 +19,14 @@ import com.beust.jcommander.ParameterException;
 import com.google.common.hash.Hashing;
 import com.google.devtools.build.remote.client.RemoteClientOptions.CatCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.GetDirCommand;
+import com.google.devtools.build.remote.client.RemoteClientOptions.GetOutDirCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.LsCommand;
+import com.google.devtools.build.remote.client.RemoteClientOptions.LsOutDirCommand;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.DirectoryNode;
 import com.google.devtools.remoteexecution.v1test.FileNode;
+import com.google.devtools.remoteexecution.v1test.OutputDirectory;
 import com.google.devtools.remoteexecution.v1test.RequestMetadata;
 import com.google.devtools.remoteexecution.v1test.ToolDetails;
 import com.google.devtools.remoteexecution.v1test.Tree;
@@ -79,7 +82,7 @@ public class RemoteClient {
   // Recursively list directory files/subdirectories with digests. Returns the number of files
   // listed.
   private int listDirectory(Path path, Directory dir, Map<Digest, Directory> childrenMap, int limit)
-      throws IOException, InterruptedException {
+      throws IOException {
     // Try to list the files in this directory before listing the directories.
     int numFilesListed = listFileNodes(path, dir, limit);
     if (numFilesListed >= limit) {
@@ -98,6 +101,22 @@ public class RemoteClient {
     return numFilesListed;
   }
 
+  // Recursively list OutputDirectory with digests.
+  private void listOutputDirectory(OutputDirectory dir, int limit) throws IOException {
+    Tree tree;
+    try {
+      tree = Tree.parseFrom(cache.downloadBlob(dir.getTreeDigest()));
+    } catch (IOException e) {
+      throw new IOException("Failed to obtain Tree for OutputDirectory.", e);
+    }
+    Map<Digest, Directory> childrenMap = new HashMap<>();
+    for (Directory child : tree.getChildrenList()) {
+      childrenMap.put(digestUtil.compute(child), child);
+    }
+    System.out.printf("OutputDirectory rooted at %s:\n", dir.getPath());
+    listDirectory(Paths.get(""), tree.getRoot(), childrenMap, limit);
+  }
+
   // Recursively list directory files/subdirectories with digests given a Tree of the directory.
   private void listTree(Path path, Tree tree, int limit) throws IOException, InterruptedException {
     Map<Digest, Directory> childrenMap = new HashMap<>();
@@ -112,7 +131,9 @@ public class RemoteClient {
     RemoteOptions remoteOptions = new RemoteOptions();
     RemoteClientOptions remoteClientOptions = new RemoteClientOptions();
     LsCommand lsCommand = new LsCommand();
+    LsOutDirCommand lsOutDirCommand = new LsOutDirCommand();
     GetDirCommand getDirCommand = new GetDirCommand();
+    GetOutDirCommand getOutDirCommand = new GetOutDirCommand();
     CatCommand catCommand = new CatCommand();
 
     JCommander optionsParser =
@@ -122,7 +143,9 @@ public class RemoteClient {
             .addObject(remoteOptions)
             .addObject(remoteClientOptions)
             .addCommand("ls", lsCommand)
+            .addCommand("lsoutdir", lsOutDirCommand)
             .addCommand("getdir", getDirCommand)
+            .addCommand("getoutdir", getOutDirCommand)
             .addCommand("cat", catCommand)
             .build();
 
@@ -167,9 +190,29 @@ public class RemoteClient {
       return;
     }
 
+    if (optionsParser.getParsedCommand() == "lsoutdir") {
+      OutputDirectory dir;
+      try {
+        dir = OutputDirectory.parseFrom(cache.downloadBlob(lsOutDirCommand.digest));
+      } catch (IOException e) {
+        throw new IOException("Failed to obtain OutputDirectory.", e);
+      }
+      client.listOutputDirectory(dir, lsOutDirCommand.limit);
+    }
+
     if (optionsParser.getParsedCommand() == "getdir") {
       cache.downloadDirectory(getDirCommand.path, getDirCommand.digest);
       return;
+    }
+
+    if (optionsParser.getParsedCommand() == "getoutdir") {
+      OutputDirectory dir;
+      try {
+        dir = OutputDirectory.parseFrom(cache.downloadBlob(getOutDirCommand.digest));
+      } catch (IOException e) {
+        throw new IOException("Failed to obtain OutputDirectory.", e);
+      }
+      cache.downloadOutputDirectory(dir, getOutDirCommand.path);
     }
 
     if (optionsParser.getParsedCommand() == "cat") {

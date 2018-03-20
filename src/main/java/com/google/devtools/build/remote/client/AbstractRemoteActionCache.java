@@ -18,6 +18,7 @@ import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.DirectoryNode;
 import com.google.devtools.remoteexecution.v1test.FileNode;
+import com.google.devtools.remoteexecution.v1test.OutputDirectory;
 import com.google.devtools.remoteexecution.v1test.Tree;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
@@ -56,9 +57,18 @@ public abstract class AbstractRemoteActionCache {
    *     failed.
    */
   public Tree getTree(Digest rootDigest) throws IOException {
-    Directory rootDir = Directory.parseFrom(downloadBlob(rootDigest));
+    Directory rootDir;
+    try {
+      rootDir = Directory.parseFrom(downloadBlob(rootDigest));
+    } catch (IOException e) {
+      throw new IOException("Failed to obtain Directory from digest.", e);
+    }
     List<Directory> children = new ArrayList<>();
-    addChildDirectories(rootDir, children);
+    try {
+      addChildDirectories(rootDir, children);
+    } catch (IOException e) {
+      throw new IOException("Failed to obtain subdirectory Directory proto.", e);
+    }
     return Tree.newBuilder().setRoot(rootDir).addAllChildren(children).build();
   }
 
@@ -67,7 +77,8 @@ public abstract class AbstractRemoteActionCache {
    */
   private void addChildDirectories(Directory dir, List<Directory> directories) throws IOException {
     for (DirectoryNode childNode : dir.getDirectoriesList()) {
-      Directory childDir = Directory.parseFrom(downloadBlob(childNode.getDigest()));
+      Directory childDir;
+      childDir = Directory.parseFrom(downloadBlob(childNode.getDigest()));
       directories.add(childDir);
       addChildDirectories(childDir, directories);
     }
@@ -104,7 +115,11 @@ public abstract class AbstractRemoteActionCache {
     Files.createDirectories(path);
     for (FileNode child : dir.getFilesList()) {
       Path childPath = path.resolve(child.getName());
-      downloadFile(childPath, child.getDigest(), child.getIsExecutable(), null);
+      try {
+        downloadFile(childPath, child.getDigest(), child.getIsExecutable(), null);
+      } catch (IOException e) {
+        throw new IOException(String.format("Failed to download file %s", child.getName()), e);
+      }
     }
     for (DirectoryNode child : dir.getDirectoriesList()) {
       Path childPath = path.resolve(child.getName());
@@ -122,6 +137,27 @@ public abstract class AbstractRemoteActionCache {
       }
       downloadDirectory(childPath, childDir, childrenMap);
     }
+  }
+
+  /**
+   * Download the full contents of a OutputDirectory to a local path.
+   *
+   * @param dir The OutputDirectory to download.
+   * @param path The path to download the directory to.
+   * @throws IOException
+   */
+  public void downloadOutputDirectory(OutputDirectory dir, Path path) throws IOException {
+    Tree tree;
+    try {
+      tree = Tree.parseFrom(downloadBlob(dir.getTreeDigest()));
+    } catch (IOException e) {
+      throw new IOException("Could not obtain tree for OutputDirectory.", e);
+    }
+    Map<Digest, Directory> childrenMap = new HashMap<>();
+    for (Directory child : tree.getChildrenList()) {
+      childrenMap.put(digestUtil.compute(child), child);
+    }
+    downloadDirectory(path, tree.getRoot(), childrenMap);
   }
 
   /** Sets owner executable permission depending on isExecutable. */
