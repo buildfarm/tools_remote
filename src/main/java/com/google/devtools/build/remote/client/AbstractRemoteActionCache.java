@@ -77,8 +77,7 @@ public abstract class AbstractRemoteActionCache {
    */
   private void addChildDirectories(Directory dir, List<Directory> directories) throws IOException {
     for (DirectoryNode childNode : dir.getDirectoriesList()) {
-      Directory childDir;
-      childDir = Directory.parseFrom(downloadBlob(childNode.getDigest()));
+      Directory childDir = Directory.parseFrom(downloadBlob(childNode.getDigest()));
       directories.add(childDir);
       addChildDirectories(childDir, directories);
     }

@@ -1,6 +1,9 @@
 java_test(
     name = "GrpcRemoteCacheTest",
-    srcs = glob(["*.java"]),
+    srcs = [
+        "FakeImmutableCacheByteStreamImpl.java",
+        "GrpcRemoteCacheTest.java",
+    ],
     deps = [
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/http_client:google_http_client",
@@ -17,5 +20,14 @@ java_test(
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_proto",
+    ],
+)
+
+java_test(
+    name = "ShellEscaperTest",
+    srcs = ["ShellEscaperTest.java"],
+    deps = [
+        "//src/main/java/com/google/devtools/build/remote/client",
+        "//3rdparty/jvm/com/google/truth",
     ],
 )

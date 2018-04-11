@@ -37,7 +37,7 @@ public final class RemoteClientOptions {
   )
   public static class LsCommand {
     @Parameter(
-      names = { "--digest", "-d" },
+      names = {"--digest", "-d"},
       required = true,
       converter = DigestConverter.class,
       description = "The digest of the Directory to list in hex_hash/size_bytes."
@@ -45,7 +45,7 @@ public final class RemoteClientOptions {
     public Digest digest = null;
 
     @Parameter(
-      names = { "--limit", "-l" },
+      names = {"--limit", "-l"},
       description = "The maximum number of files in the Directory to list."
     )
     public int limit = 100;
@@ -57,7 +57,7 @@ public final class RemoteClientOptions {
   )
   public static class LsOutDirCommand {
     @Parameter(
-      names = { "--digest", "-d" },
+      names = {"--digest", "-d"},
       required = true,
       converter = DigestConverter.class,
       description = "The digest of the OutputDirectory to list in hex_hash/size_bytes."
@@ -65,7 +65,7 @@ public final class RemoteClientOptions {
     public Digest digest = null;
 
     @Parameter(
-      names = { "--limit", "-l" },
+      names = {"--limit", "-l"},
       description = "The maximum number of files in the OutputDirectory to list."
     )
     public int limit = 100;
@@ -77,7 +77,7 @@ public final class RemoteClientOptions {
   )
   public static class GetDirCommand {
     @Parameter(
-      names = { "--digest", "-d" },
+      names = {"--digest", "-d"},
       required = true,
       converter = DigestConverter.class,
       description = "The digest of the Directory to download in hex_hash/size_bytes."
@@ -85,7 +85,7 @@ public final class RemoteClientOptions {
     public Digest digest = null;
 
     @Parameter(
-      names = { "--path", "-o" },
+      names = {"--path", "-o"},
       converter = PathConverter.class,
       description = "The local path to download the Directory contents into."
     )
@@ -98,7 +98,7 @@ public final class RemoteClientOptions {
   )
   public static class GetOutDirCommand {
     @Parameter(
-      names = { "--digest", "-d" },
+      names = {"--digest", "-d"},
       required = true,
       converter = DigestConverter.class,
       description = "The digest of the OutputDirectory to download in hex_hash/size_bytes."
@@ -106,7 +106,7 @@ public final class RemoteClientOptions {
     public Digest digest = null;
 
     @Parameter(
-      names = { "--path", "-o" },
+      names = {"--path", "-o"},
       converter = PathConverter.class,
       description = "The local path to download the OutputDirectory contents into."
     )
@@ -121,7 +121,7 @@ public final class RemoteClientOptions {
   )
   public static class CatCommand {
     @Parameter(
-      names = { "--digest", "-d" },
+      names = {"--digest", "-d"},
       required = true,
       converter = DigestConverter.class,
       description = "The digest in the format hex_hash/size_bytes of the blob to download."
@@ -129,11 +129,55 @@ public final class RemoteClientOptions {
     public Digest digest = null;
 
     @Parameter(
-      names = { "--file", "-o" },
+      names = {"--file", "-o"},
       converter = FileConverter.class,
       description = "Specifies a file to write the blob contents to instead of stdout."
     )
     public File file = null;
+  }
+
+  @Parameters(
+    commandDescription = "Parse and display an Action with its corresponding command.",
+    separators = "="
+  )
+  public static class ShowActionCommand {
+    @Parameter(
+      names = {"--textproto", "-p"},
+      required = true,
+      converter = FileConverter.class,
+      description = "Path to a Action proto stored in protobuf text format."
+    )
+    public File file = null;
+
+    @Parameter(
+      names = {"--limit", "-l"},
+      description = "The maximum number of input/output files to list."
+    )
+    public int limit = 100;
+  }
+
+  @Parameters(commandDescription = "Parse and display an ActionResult.", separators = "=")
+  public static class ShowActionResultCommand {
+    @Parameter(
+      names = {"--textproto", "-p"},
+      required = true,
+      converter = FileConverter.class,
+      description = "Path to a ActionResult proto stored in protobuf text format."
+    )
+    public File file = null;
+
+    @Parameter(
+      names = {"--limit", "-l"},
+      description = "The maximum number of output files to list."
+    )
+    public int limit = 100;
+
+    @Parameter(
+      names = {"--show_raw_output", "-r"},
+      description =
+          "Print OutputFile contents if they were returned as raw bytes in the given ActionResult."
+    )
+    public boolean showRawOutputs = false;
   }
 
   /** Converter for hex_hash/size_bytes string to a Digest object. */
