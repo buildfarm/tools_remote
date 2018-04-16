@@ -18,16 +18,14 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.ParameterException;
-import com.google.common.base.CharMatcher;
-import com.google.common.base.Joiner;
-import com.google.common.escape.CharEscaperBuilder;
-import com.google.common.escape.Escaper;
 import com.google.common.hash.Hashing;
+import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
 import com.google.devtools.build.remote.client.RemoteClientOptions.CatCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.GetDirCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.GetOutDirCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.LsCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.LsOutDirCommand;
+import com.google.devtools.build.remote.client.RemoteClientOptions.PrintLogCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.ShowActionCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.ShowActionResultCommand;
 import com.google.devtools.remoteexecution.v1test.Action;
@@ -47,6 +45,7 @@ import com.google.protobuf.TextFormat;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.file.Path;
@@ -60,6 +59,8 @@ public class RemoteClient {
 
   private final AbstractRemoteActionCache cache;
   private final DigestUtil digestUtil;
+  private static final String DELIMETER = "\n---------------------------------------------------------\n";
+
 
   private RemoteClient(AbstractRemoteActionCache cache) {
     this.cache = cache;
@@ -270,6 +271,7 @@ public class RemoteClient {
     CatCommand catCommand = new CatCommand();
     ShowActionCommand showActionCommand = new ShowActionCommand();
     ShowActionResultCommand showActionResultCommand = new ShowActionResultCommand();
+    PrintLogCommand printLogCommand = new PrintLogCommand();
 
     JCommander optionsParser =
         JCommander.newBuilder()
@@ -284,6 +286,7 @@ public class RemoteClient {
             .addCommand("cat", catCommand)
             .addCommand("show_action", showActionCommand, "sa")
             .addCommand("show_action_result", showActionResultCommand, "sar")
+            .addCommand("printlog", printLogCommand)
             .build();
 
     try {
@@ -305,7 +308,18 @@ public class RemoteClient {
       System.exit(1);
     }
 
-    // All commands after this require a working cache.
+    if (optionsParser.getParsedCommand() == "printlog") {
+      try (InputStream in = new FileInputStream(printLogCommand.file)) {
+        while (in.available() > 0) {
+          LogEntry entry = LogEntry.parseDelimitedFrom(in);
+          System.out.println(entry);
+          System.out.println(DELIMETER);
+        }
+      }
+      return;
+    }
+
+    // All commands after this require a remote client.
     DigestUtil digestUtil = new DigestUtil(Hashing.sha256());
     AbstractRemoteActionCache cache;
 
@@ -392,5 +406,6 @@ public class RemoteClient {
           builder.build(), showActionResultCommand.limit, showActionResultCommand.showRawOutputs);
       return;
     }
+
   }
 }

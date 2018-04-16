@@ -180,6 +180,23 @@ public final class RemoteClientOptions {
     public boolean showRawOutputs = false;
   }
 
+  @Parameters(
+      commandDescription =
+          "Write all log entries from a Bazel gRPC log to standard output. The Bazel gRPC log "
+              + "consists of a sequence of delimited serialized LogEntry protobufs, as produced by "
+              + "the method LogEntry.writeDelimitedTo(OutputStream).",
+      separators = "="
+  )
+  public static class PrintLogCommand {
+    @Parameter(
+        names = { "--file", "-f" },
+        required = true,
+        converter = FileConverter.class,
+        description = "Path to log file."
+    )
+    public File file = null;
+  }
+
   /** Converter for hex_hash/size_bytes string to a Digest object. */
   public static class DigestConverter implements IStringConverter<Digest> {
     @Override
