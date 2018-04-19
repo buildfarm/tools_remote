@@ -19,7 +19,6 @@ java_test(
         "@googleapis//:google_bytestream_bytestream_java_proto",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_proto",
     ],
 )
 
@@ -27,7 +26,18 @@ java_test(
     name = "ShellEscaperTest",
     srcs = ["ShellEscaperTest.java"],
     deps = [
-        "//src/main/java/com/google/devtools/build/remote/client",
         "//3rdparty/jvm/com/google/truth",
+        "//src/main/java/com/google/devtools/build/remote/client",
+    ],
+)
+
+java_test(
+    name = "DockerUtilTest",
+    srcs = ["DockerUtilTest.java"],
+    deps = [
+        "//3rdparty/jvm/com/google/truth",
+        "//src/main/java/com/google/devtools/build/remote/client",
+        "@com_google_guava_guava//jar",
+        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
     ],
 )

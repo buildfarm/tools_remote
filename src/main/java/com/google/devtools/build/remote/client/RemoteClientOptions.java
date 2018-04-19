@@ -181,20 +181,45 @@ public final class RemoteClientOptions {
   }
 
   @Parameters(
-      commandDescription =
-          "Write all log entries from a Bazel gRPC log to standard output. The Bazel gRPC log "
-              + "consists of a sequence of delimited serialized LogEntry protobufs, as produced by "
-              + "the method LogEntry.writeDelimitedTo(OutputStream).",
-      separators = "="
+    commandDescription =
+        "Write all log entries from a Bazel gRPC log to standard output. The Bazel gRPC log "
+            + "consists of a sequence of delimited serialized LogEntry protobufs, as produced by "
+            + "the method LogEntry.writeDelimitedTo(OutputStream).",
+    separators = "="
   )
   public static class PrintLogCommand {
     @Parameter(
-        names = { "--file", "-f" },
-        required = true,
-        converter = FileConverter.class,
-        description = "Path to log file."
+      names = {"--file", "-f"},
+      required = true,
+      converter = FileConverter.class,
+      description = "Path to log file."
     )
     public File file = null;
+  }
+
+  @Parameters(
+    commandDescription =
+        "Sets up a directory and Docker command to locally run a single action"
+            + "given its Action proto. This requires the Action's inputs to be stored in CAS so that "
+            + "they can be retrieved.",
+    separators = "="
+  )
+  public static class RunCommand {
+    @Parameter(
+      names = {"--textproto", "-p"},
+      required = true,
+      converter = FileConverter.class,
+      description =
+          "Path to the Action proto stored in protobuf text format to be run in the " + "container."
+    )
+    public File file = null;
+
+    @Parameter(
+      names = {"--path", "-o"},
+      converter = PathConverter.class,
+      description = "Path to set up the action inputs in."
+    )
+    public Path path = null;
   }
 
   /** Converter for hex_hash/size_bytes string to a Digest object. */

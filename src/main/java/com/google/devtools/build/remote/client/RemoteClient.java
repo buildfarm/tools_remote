@@ -19,6 +19,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.ParameterException;
 import com.google.common.hash.Hashing;
+import com.google.common.io.Files;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
 import com.google.devtools.build.remote.client.RemoteClientOptions.CatCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.GetDirCommand;
@@ -26,6 +27,7 @@ import com.google.devtools.build.remote.client.RemoteClientOptions.GetOutDirComm
 import com.google.devtools.build.remote.client.RemoteClientOptions.LsCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.LsOutDirCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.PrintLogCommand;
+import com.google.devtools.build.remote.client.RemoteClientOptions.RunCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.ShowActionCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.ShowActionResultCommand;
 import com.google.devtools.remoteexecution.v1test.Action;
@@ -48,6 +50,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.file.FileSystemAlreadyExistsException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -59,12 +62,16 @@ public class RemoteClient {
 
   private final AbstractRemoteActionCache cache;
   private final DigestUtil digestUtil;
-  private static final String DELIMETER = "\n---------------------------------------------------------\n";
-
+  private static final String DELIMETER =
+      "\n---------------------------------------------------------\n";
 
   private RemoteClient(AbstractRemoteActionCache cache) {
     this.cache = cache;
     this.digestUtil = cache.getDigestUtil();
+  }
+
+  public AbstractRemoteActionCache getCache() {
+    return cache;
   }
 
   // Prints the details (path and digest) of a DirectoryNode.
@@ -183,7 +190,7 @@ public class RemoteClient {
     Tree tree = cache.getTree(action.getInputRootDigest());
     System.out.printf(
         "\nInput files [total: %d, root Directory digest: %s]:\n",
-        getNumFiles(tree), digestUtil.toString(action.getCommandDigest()));
+        getNumFiles(tree), digestUtil.toString(action.getInputRootDigest()));
     listTree(Paths.get(""), tree, limit);
 
     System.out.println("\nOutput files:");
@@ -260,6 +267,147 @@ public class RemoteClient {
     }
   }
 
+  // Given a docker run action, sets up a directory for an Action to be run in (download Action
+  // inputs, set up output directories), and display a docker command that will run the Action.
+  private void setupDocker(Action action, Path root) throws IOException {
+    System.out.printf("Setting up Action in directory %s...\n", root.toAbsolutePath());
+    Command command;
+    try {
+      command = Command.parseFrom(cache.downloadBlob(action.getCommandDigest()));
+    } catch (IOException e) {
+      throw new IOException("Failed to get Command for Action.", e);
+    }
+
+    try {
+      cache.downloadDirectory(root, action.getInputRootDigest());
+    } catch (IOException e) {
+      throw new IOException("Failed to download action inputs.", e);
+    }
+
+    // Setup directory structure for outputs.
+    for (String output : action.getOutputFilesList()) {
+      Path file = root.resolve(output);
+      if (java.nio.file.Files.exists(file)) {
+        throw new FileSystemAlreadyExistsException("Output file already exists: " + file);
+      }
+      Files.createParentDirs(file.toFile());
+    }
+    for (String output : action.getOutputDirectoriesList()) {
+      Path dir = root.resolve(output);
+      if (java.nio.file.Files.exists(dir)) {
+        throw new FileSystemAlreadyExistsException("Output directory already exists: " + dir);
+      }
+      java.nio.file.Files.createDirectories(dir);
+    }
+    String dockerCommand = DockerUtil.getDockerCommand(action, command, root.toString());
+    System.out.println("\nSuccessfully setup Action in directory " + root.toString() + ".");
+    System.out.println("\nTo run the Action locally, run:");
+    System.out.println("  " + dockerCommand);
+  }
+
+  private static RemoteClient makeClientWithOptions(
+      RemoteOptions remoteOptions, AuthAndTLSOptions authAndTlsOptions) throws IOException {
+    DigestUtil digestUtil = new DigestUtil(Hashing.sha256());
+    AbstractRemoteActionCache cache;
+
+    if (GrpcRemoteCache.isRemoteCacheOptions(remoteOptions)) {
+      cache = new GrpcRemoteCache(remoteOptions, authAndTlsOptions, digestUtil);
+      RequestMetadata metadata =
+          RequestMetadata.newBuilder()
+              .setToolDetails(ToolDetails.newBuilder().setToolName("remote_client"))
+              .build();
+      TracingMetadataUtils.contextWithMetadata(metadata).attach();
+    } else {
+      throw new UnsupportedOperationException("Only gRPC remote cache supported currently.");
+    }
+    return new RemoteClient(cache);
+  }
+
+  private static void doPrintLog(PrintLogCommand options) throws IOException {
+    try (InputStream in = new FileInputStream(options.file)) {
+      LogEntry entry;
+      while ((entry = LogEntry.parseDelimitedFrom(in)) != null) {
+        System.out.println(entry);
+        System.out.println(DELIMETER);
+      }
+    }
+  }
+
+  private static void doLs(LsCommand options, RemoteClient client) throws IOException {
+    Tree tree = client.getCache().getTree(options.digest);
+    client.listTree(Paths.get(""), tree, options.limit);
+  }
+
+  private static void doLsOutDir(LsOutDirCommand options, RemoteClient client) throws IOException {
+    OutputDirectory dir;
+    try {
+      dir = OutputDirectory.parseFrom(client.getCache().downloadBlob(options.digest));
+    } catch (IOException e) {
+      throw new IOException("Failed to obtain OutputDirectory.", e);
+    }
+    client.listOutputDirectory(dir, options.limit);
+  }
+
+  private static void doGetDir(GetDirCommand options, RemoteClient client) throws IOException {
+    client.getCache().downloadDirectory(options.path, options.digest);
+  }
+
+  private static void doGetOutDir(GetOutDirCommand options, RemoteClient client)
+      throws IOException {
+    OutputDirectory dir;
+    try {
+      dir = OutputDirectory.parseFrom(client.getCache().downloadBlob(options.digest));
+    } catch (IOException e) {
+      throw new IOException("Failed to obtain OutputDirectory.", e);
+    }
+    client.getCache().downloadOutputDirectory(dir, options.path);
+  }
+
+  private static void doCat(CatCommand options, RemoteClient client) throws IOException {
+    OutputStream output;
+    if (options.file != null) {
+      output = new FileOutputStream(options.file);
+
+      if (!options.file.exists()) {
+        options.file.createNewFile();
+      }
+    } else {
+      output = System.out;
+    }
+
+    try {
+      client.getCache().downloadBlob(options.digest, output);
+    } catch (CacheNotFoundException e) {
+      System.err.println("Error: " + e);
+    } finally {
+      output.close();
+    }
+  }
+
+  private static void doShowAction(ShowActionCommand options, RemoteClient client)
+      throws IOException {
+    Action.Builder builder = Action.newBuilder();
+    FileInputStream fin = new FileInputStream(options.file);
+    TextFormat.getParser().merge(new InputStreamReader(fin), builder);
+    client.printAction(builder.build(), options.limit);
+  }
+
+  private static void doShowActionResult(ShowActionResultCommand options, RemoteClient client)
+      throws IOException {
+    ActionResult.Builder builder = ActionResult.newBuilder();
+    FileInputStream fin = new FileInputStream(options.file);
+    TextFormat.getParser().merge(new InputStreamReader(fin), builder);
+    client.printActionResult(builder.build(), options.limit, options.showRawOutputs);
+  }
+
+  private static void doRun(RunCommand options, RemoteClient client) throws IOException {
+    Action.Builder builder = Action.newBuilder();
+    FileInputStream fin = new FileInputStream(options.file);
+    TextFormat.getParser().merge(new InputStreamReader(fin), builder);
+    client.setupDocker(
+        builder.build(), options.path != null ? options.path : Files.createTempDir().toPath());
+  }
+
   public static void main(String[] args) throws Exception {
     AuthAndTLSOptions authAndTlsOptions = new AuthAndTLSOptions();
     RemoteOptions remoteOptions = new RemoteOptions();
@@ -272,6 +420,7 @@ public class RemoteClient {
     ShowActionCommand showActionCommand = new ShowActionCommand();
     ShowActionResultCommand showActionResultCommand = new ShowActionResultCommand();
     PrintLogCommand printLogCommand = new PrintLogCommand();
+    RunCommand runCommand = new RunCommand();
 
     JCommander optionsParser =
         JCommander.newBuilder()
@@ -287,6 +436,7 @@ public class RemoteClient {
             .addCommand("show_action", showActionCommand, "sa")
             .addCommand("show_action_result", showActionResultCommand, "sar")
             .addCommand("printlog", printLogCommand)
+            .addCommand("run", runCommand)
             .build();
 
     try {
@@ -308,104 +458,37 @@ public class RemoteClient {
       System.exit(1);
     }
 
-    if (optionsParser.getParsedCommand() == "printlog") {
-      try (InputStream in = new FileInputStream(printLogCommand.file)) {
-        while (in.available() > 0) {
-          LogEntry entry = LogEntry.parseDelimitedFrom(in);
-          System.out.println(entry);
-          System.out.println(DELIMETER);
-        }
-      }
-      return;
+    switch (optionsParser.getParsedCommand()) {
+      case "printlog":
+        doPrintLog(printLogCommand);
+        break;
+      case "ls":
+        doLs(lsCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
+        break;
+      case "lsoutdir":
+        doLsOutDir(lsOutDirCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
+        break;
+      case "getdir":
+        doGetDir(getDirCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
+        break;
+      case "getoutdir":
+        doGetOutDir(getOutDirCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
+        break;
+      case "cat":
+        doCat(catCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
+        break;
+      case "show_action":
+        doShowAction(showActionCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
+        break;
+      case "show_action_result":
+        doShowActionResult(
+            showActionResultCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
+        break;
+      case "run":
+        doRun(runCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
+        break;
+      default:
+        throw new IllegalArgumentException("Unknown command.");
     }
-
-    // All commands after this require a remote client.
-    DigestUtil digestUtil = new DigestUtil(Hashing.sha256());
-    AbstractRemoteActionCache cache;
-
-    if (GrpcRemoteCache.isRemoteCacheOptions(remoteOptions)) {
-      cache = new GrpcRemoteCache(remoteOptions, authAndTlsOptions, digestUtil);
-      RequestMetadata metadata =
-          RequestMetadata.newBuilder()
-              .setToolDetails(ToolDetails.newBuilder().setToolName("remote_client"))
-              .build();
-      TracingMetadataUtils.contextWithMetadata(metadata).attach();
-    } else {
-      throw new UnsupportedOperationException(
-          "Only gRPC remote cache supported currently (cache not configured in options).");
-    }
-
-    RemoteClient client = new RemoteClient(cache);
-
-    if (optionsParser.getParsedCommand() == "ls") {
-      Tree tree = cache.getTree(lsCommand.digest);
-      client.listTree(Paths.get(""), tree, lsCommand.limit);
-      return;
-    }
-
-    if (optionsParser.getParsedCommand() == "lsoutdir") {
-      OutputDirectory dir;
-      try {
-        dir = OutputDirectory.parseFrom(cache.downloadBlob(lsOutDirCommand.digest));
-      } catch (IOException e) {
-        throw new IOException("Failed to obtain OutputDirectory.", e);
-      }
-      client.listOutputDirectory(dir, lsOutDirCommand.limit);
-    }
-
-    if (optionsParser.getParsedCommand() == "getdir") {
-      cache.downloadDirectory(getDirCommand.path, getDirCommand.digest);
-      return;
-    }
-
-    if (optionsParser.getParsedCommand() == "getoutdir") {
-      OutputDirectory dir;
-      try {
-        dir = OutputDirectory.parseFrom(cache.downloadBlob(getOutDirCommand.digest));
-      } catch (IOException e) {
-        throw new IOException("Failed to obtain OutputDirectory.", e);
-      }
-      cache.downloadOutputDirectory(dir, getOutDirCommand.path);
-    }
-
-    if (optionsParser.getParsedCommand() == "cat") {
-      OutputStream output;
-      if (catCommand.file != null) {
-        output = new FileOutputStream(catCommand.file);
-
-        if (!catCommand.file.exists()) {
-          catCommand.file.createNewFile();
-        }
-      } else {
-        output = System.out;
-      }
-
-      try {
-        cache.downloadBlob(catCommand.digest, output);
-      } catch (CacheNotFoundException e) {
-        System.err.println("Error: " + e);
-      } finally {
-        output.close();
-      }
-      return;
-    }
-
-    if (optionsParser.getParsedCommand() == "show_action") {
-      Action.Builder builder = Action.newBuilder();
-      FileInputStream fin = new FileInputStream(showActionCommand.file);
-      TextFormat.getParser().merge(new InputStreamReader(fin), builder);
-      client.printAction(builder.build(), showActionCommand.limit);
-      return;
-    }
-
-    if (optionsParser.getParsedCommand() == "show_action_result") {
-      ActionResult.Builder builder = ActionResult.newBuilder();
-      FileInputStream fin = new FileInputStream(showActionResultCommand.file);
-      TextFormat.getParser().merge(new InputStreamReader(fin), builder);
-      client.printActionResult(
-          builder.build(), showActionResultCommand.limit, showActionResultCommand.showRawOutputs);
-      return;
-    }
-
   }
 }
