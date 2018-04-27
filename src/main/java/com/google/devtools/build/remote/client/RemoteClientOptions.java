@@ -195,6 +195,15 @@ public final class RemoteClientOptions {
       description = "Path to log file."
     )
     public File file = null;
+
+    @Parameter(
+      names = {"--group_by_action", "-g"},
+      description =
+          "Display entries grouped by action instead of individually. Entries are printed in order "
+              + "of their call started timestamps (earliest first). Entries without action-id"
+              + "metadata are skipped."
+    )
+    public boolean groupByAction;
   }
 
   @Parameters(
