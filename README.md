@@ -143,7 +143,7 @@ just run this to regenerate the 3rdparty folder:
 git clone https://github.com/johnynek/bazel-deps.git ../bazel-deps
 cd ../bazel-deps
 bazel build //src/scala/com/github/johnynek/bazel_deps:parseproject_deploy.jar
-cd ../remote_client
+cd ../tools_remote
 ../bazel-deps/gen_maven_deps.sh generate -r `pwd` -s 3rdparty/workspace.bzl -d dependencies.yaml
 ```
 
