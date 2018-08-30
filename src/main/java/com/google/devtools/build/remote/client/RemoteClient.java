@@ -401,6 +401,17 @@ public class RemoteClient {
   }
 
   public static void main(String[] args) throws Exception {
+    try {
+      selectAndPerformCommand(args);
+    } catch (io.grpc.StatusRuntimeException e) {
+      if(e.getMessage().equals("INTERNAL: http2 exception")) {
+        System.err.println("http2 exception. Did you forget --tls_enabled?");
+      }
+      throw e;
+    }
+  }
+
+  public static void selectAndPerformCommand(String[] args) throws Exception {
     AuthAndTLSOptions authAndTlsOptions = new AuthAndTLSOptions();
     RemoteOptions remoteOptions = new RemoteOptions();
     RemoteClientOptions remoteClientOptions = new RemoteClientOptions();
