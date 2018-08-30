@@ -25,7 +25,7 @@ import java.util.List;
 @Parameters(separators = "=")
 public final class AuthAndTLSOptions {
   @Parameter(
-    names = "--google_default_credentials",
+    names = { "--google_default_credentials","--auth_enabled" },
     arity = 1,
     description =
         "Whether to use 'Google Application Default Credentials' for authentication."

@@ -46,6 +46,8 @@ import com.google.protobuf.TextFormat;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import io.grpc.StatusRuntimeException;
+import io.grpc.Status;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.file.FileSystemAlreadyExistsException;
@@ -401,6 +403,18 @@ public class RemoteClient {
   }
 
   public static void main(String[] args) throws Exception {
+    try {
+      selectAndPerformCommand(args);
+    } catch (io.grpc.StatusRuntimeException e) {
+      Status s = Status.fromThrowable(e);
+      if (s.getCode() == Status.Code.INTERNAL && s.getDescription().contains("http2")) {
+        System.err.println("http2 exception. Did you forget --tls_enabled?");
+      }
+      throw e;
+    }
+  }
+
+  public static void selectAndPerformCommand(String[] args) throws Exception {
     AuthAndTLSOptions authAndTlsOptions = new AuthAndTLSOptions();
     RemoteOptions remoteOptions = new RemoteOptions();
     RemoteClientOptions remoteClientOptions = new RemoteClientOptions();
