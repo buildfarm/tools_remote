@@ -60,7 +60,7 @@ running the remote build with the `--experimental_remote_grpc_log=PATH_TO_LOG` f
 creates a file consisting of serialized log entry protobufs which can be printed by this tool in a
 human-readable way with the `printlog` command:
 
-    $ bazel-bin/remote_client printlog -f PATH_TO_LOG
+    $ bazel-bin/remote_client --grpc_log PATH_TO_LOG printlog
 
 ### Running Actions in Docker
 

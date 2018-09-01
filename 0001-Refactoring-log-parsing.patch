@@ -1,0 +1,514 @@
+From 5177580f3b368249b4a69122383bc42f2f1f54fe Mon Sep 17 00:00:00 2001
+From: Alexandra <agoulti@google.com>
+Date: Fri, 31 Aug 2018 18:17:01 -0400
+Subject: [PATCH] Refactoring log parsing.
+
+This will allow future reuse of group by action logic.
+---
+ .gitignore                                    |   1 +
+ .../build/remote/client/ActionGrouping.java   |  71 ++++++++
+ .../build/remote/client/LogParserUtils.java   | 155 ++++++++++++++++++
+ .../build/remote/client/LogPrintingUtils.java | 150 -----------------
+ .../build/remote/client/RemoteClient.java     |  10 +-
+ .../remote/client/RemoteClientOptions.java    |  15 +-
+ 6 files changed, 237 insertions(+), 165 deletions(-)
+ create mode 100644 src/main/java/com/google/devtools/build/remote/client/ActionGrouping.java
+ create mode 100644 src/main/java/com/google/devtools/build/remote/client/LogParserUtils.java
+ delete mode 100644 src/main/java/com/google/devtools/build/remote/client/LogPrintingUtils.java
+
+diff --git a/.gitignore b/.gitignore
+index 0b936a0..f4b7419 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,4 +1,5 @@
+ *~
+ bazel-*
+ .idea/
++.ijwb/
+ *.iml
+diff --git a/src/main/java/com/google/devtools/build/remote/client/ActionGrouping.java b/src/main/java/com/google/devtools/build/remote/client/ActionGrouping.java
+new file mode 100644
+index 0000000..c37692b
+--- /dev/null
++++ b/src/main/java/com/google/devtools/build/remote/client/ActionGrouping.java
+@@ -0,0 +1,71 @@
++package com.google.devtools.build.remote.client;
++
++import static java.nio.charset.StandardCharsets.UTF_8;
++
++import com.google.common.collect.Multiset;
++import com.google.common.collect.TreeMultiset;
++import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
++import com.google.protobuf.Timestamp;
++import java.io.BufferedWriter;
++import java.io.FileInputStream;
++import java.io.IOException;
++import java.io.InputStream;
++import java.io.OutputStream;
++import java.io.OutputStreamWriter;
++import java.io.PrintWriter;
++import java.util.HashMap;
++import java.util.Map;
++
++/**
++ * A class to handle GRPc log grouped by actions
++ */
++final class ActionGrouping {
++
++  /**
++   * Gives comparator values for timestamps.
++   *
++   * @return {@code 0} if {@code t1} is equal to {@code t2}; a value less than {code 0} if {@code
++   * t1} occurs before {@code t2}; a value greater than {code 0} if {@code t1} occurs after {@code
++   * t2}.
++   */
++  private static int compareTimestamps(Timestamp t1, Timestamp t2) {
++    int cmpSeconds = Long.compare(t1.getSeconds(), t2.getSeconds());
++    return (cmpSeconds != 0) ? cmpSeconds : Integer.compare(t1.getNanos(), t2.getNanos());
++  }
++
++  Map<String, Multiset<LogEntry>> actionMap = new HashMap<>();
++  int numSkipped = 0;
++
++  public ActionGrouping() {
++  }
++
++  public void addLogEntry(LogEntry entry) {
++    if (!entry.hasMetadata()) {
++      numSkipped++;
++      return;
++    }
++    String hash = entry.getMetadata().getActionId();
++    if (!actionMap.containsKey(hash)) {
++      actionMap.put(
++          hash,
++          TreeMultiset.create((a, b) -> compareTimestamps(a.getStartTime(), b.getStartTime())));
++    }
++    actionMap.get(hash).add(entry);
++  }
++
++  public void printByAction(PrintWriter out) throws IOException {
++    for (String hash : actionMap.keySet()) {
++      out.println("************************************************");
++      out.printf("Entries for action with hash '%s'\n", hash);
++      out.println("************************************************");
++      for (LogEntry entry : actionMap.get(hash)) {
++        LogParserUtils.printLogEntry(entry, out);
++        out.println("------------------------------------------------");
++      }
++    }
++    if (numSkipped > 0) {
++      System.err.printf(
++          "WARNING: Skipped %d entrie(s) due to absence of request metadata.\n", numSkipped);
++    }
++  }
++}
+diff --git a/src/main/java/com/google/devtools/build/remote/client/LogParserUtils.java b/src/main/java/com/google/devtools/build/remote/client/LogParserUtils.java
+new file mode 100644
+index 0000000..7419e02
+--- /dev/null
++++ b/src/main/java/com/google/devtools/build/remote/client/LogParserUtils.java
+@@ -0,0 +1,155 @@
++// Copyright 2018 The Bazel Authors. All rights reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//    http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++package com.google.devtools.build.remote.client;
++
++import static java.nio.charset.StandardCharsets.UTF_8;
++
++import com.google.common.collect.Multiset;
++import com.google.common.collect.TreeMultiset;
++import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
++import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.RpcCallDetails.DetailsCase;
++import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.WatchDetails;
++import com.google.devtools.build.remote.client.RemoteClientOptions.PrintLogCommand;
++import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
++import com.google.longrunning.Operation;
++import com.google.longrunning.Operation.ResultCase;
++import com.google.protobuf.Timestamp;
++import com.google.watcher.v1.Change;
++import com.google.watcher.v1.Change.State;
++import com.google.watcher.v1.ChangeBatch;
++import io.grpc.Status.Code;
++import java.io.BufferedWriter;
++import java.io.FileInputStream;
++import java.io.IOException;
++import java.io.InputStream;
++import java.io.OutputStream;
++import java.io.OutputStreamWriter;
++import java.io.PrintWriter;
++import java.util.HashMap;
++import java.util.Map;
++
++/**
++ * Methods for printing log files.
++ */
++public class LogParserUtils {
++
++  private static final String DELIMETER =
++      "---------------------------------------------------------\n";
++
++  public static class ParamException extends Exception {
++
++    public ParamException(String message) {
++      super(message);
++    }
++  }
++
++  private String filename;
++
++  public LogParserUtils(String filename) {
++    this.filename = filename;
++  }
++
++  private String getFilename() throws ParamException {
++    if (filename.isEmpty()) {
++      throw new ParamException("This operation cannot be performed without specifying --grpc_log.");
++    }
++    return filename;
++  }
++
++
++  /**
++   * Attempt to find and print ExecuteResponse from the details of a log entry for a Watch call. If
++   * no Operation could be found in the Watch call responses, or an Operation was found but failed,
++   * a failure message is printed.
++   */
++  private static void printExecuteResponse(WatchDetails watch, PrintWriter out) throws IOException {
++    for (ChangeBatch cb : watch.getResponsesList()) {
++      for (Change ch : cb.getChangesList()) {
++        if (ch.getState() != State.EXISTS) {
++          continue;
++        }
++        Operation o = ch.getData().unpack(Operation.class);
++        if (o.getResultCase() == ResultCase.ERROR && o.getError().getCode() != Code.OK.value()) {
++          out.printf("Operation contained error: %s\n", o.getError().toString());
++          return;
++        } else if (o.getResultCase() == ResultCase.RESPONSE && o.getDone()) {
++          out.println("ExecuteResponse extracted:");
++          out.println(o.getResponse().unpack(ExecuteResponse.class).toString());
++          return;
++        }
++      }
++    }
++    out.println("Could not find ExecuteResponse in Watch call details.");
++  }
++
++  /**
++   * Print an individual log entry.
++   */
++  static void printLogEntry(LogEntry entry, PrintWriter out) throws IOException {
++    out.println(entry.toString());
++    if (entry.getDetails().getDetailsCase() == DetailsCase.WATCH) {
++      out.println("\nAttempted to extract ExecuteResponse from Watch call responses:");
++      printExecuteResponse(entry.getDetails().getWatch(), out);
++    }
++  }
++
++  /**
++   * Prints each entry out individually (ungrouped) and a message at the end for how many entries
++   * were printed/skipped.
++   */
++  private void printEntriesInOrder(OutputStream outStream) throws IOException, ParamException {
++    try (InputStream in = new FileInputStream(getFilename())) {
++      PrintWriter out =
++          new PrintWriter(new BufferedWriter(new OutputStreamWriter(outStream, UTF_8)), true);
++      LogEntry entry;
++      while ((entry = LogEntry.parseDelimitedFrom(in)) != null) {
++        printLogEntry(entry, out);
++        System.out.print(DELIMETER);
++      }
++    }
++  }
++
++  private void printEntriesGroupedByAction(OutputStream outStream)
++      throws IOException, ParamException {
++    ActionGrouping byAction = new ActionGrouping();
++    ;
++    try (InputStream in = new FileInputStream(getFilename())) {
++      LogEntry entry;
++      while ((entry = LogEntry.parseDelimitedFrom(in)) != null) {
++        byAction.addLogEntry(entry);
++      }
++    }
++    PrintWriter out =
++        new PrintWriter(new BufferedWriter(new OutputStreamWriter(outStream, UTF_8)), true);
++    byAction.printByAction(out);
++  }
++
++
++  /**
++   * Print log entries to standard output according to the command line arguments given.
++   */
++  public void printLog(PrintLogCommand options) throws IOException {
++    try {
++      if (options.groupByAction) {
++        printEntriesGroupedByAction(System.out);
++      } else {
++        printEntriesInOrder(System.out);
++      }
++    } catch (ParamException e) {
++      System.err.println(e.getMessage());
++      System.exit(1);
++    }
++  }
++}
+diff --git a/src/main/java/com/google/devtools/build/remote/client/LogPrintingUtils.java b/src/main/java/com/google/devtools/build/remote/client/LogPrintingUtils.java
+deleted file mode 100644
+index b24b32c..0000000
+--- a/src/main/java/com/google/devtools/build/remote/client/LogPrintingUtils.java
++++ /dev/null
+@@ -1,150 +0,0 @@
+-// Copyright 2018 The Bazel Authors. All rights reserved.
+-//
+-// Licensed under the Apache License, Version 2.0 (the "License");
+-// you may not use this file except in compliance with the License.
+-// You may obtain a copy of the License at
+-//
+-//    http://www.apache.org/licenses/LICENSE-2.0
+-//
+-// Unless required by applicable law or agreed to in writing, software
+-// distributed under the License is distributed on an "AS IS" BASIS,
+-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-// See the License for the specific language governing permissions and
+-// limitations under the License.
+-
+-package com.google.devtools.build.remote.client;
+-
+-import com.google.common.collect.Multiset;
+-import com.google.common.collect.TreeMultiset;
+-import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
+-import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.RpcCallDetails.DetailsCase;
+-import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.WatchDetails;
+-import com.google.devtools.build.remote.client.RemoteClientOptions.PrintLogCommand;
+-import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
+-import com.google.longrunning.Operation;
+-import com.google.longrunning.Operation.ResultCase;
+-import com.google.protobuf.Timestamp;
+-import com.google.watcher.v1.Change;
+-import com.google.watcher.v1.Change.State;
+-import com.google.watcher.v1.ChangeBatch;
+-import io.grpc.Status.Code;
+-import java.io.FileInputStream;
+-import java.io.IOException;
+-import java.io.InputStream;
+-import java.util.HashMap;
+-import java.util.Map;
+-
+-/** Methods for printing log files. */
+-public class LogPrintingUtils {
+-  private static final String DELIMETER =
+-      "---------------------------------------------------------\n";
+-
+-  /**
+-   * Attempt to find and print ExecuteResponse from the details of a log entry for a Watch call. If
+-   * no Operation could be found in the Watch call responses, or an Operation was found but failed,
+-   * a failure message is printed.
+-   */
+-  private static void printExecuteResponse(WatchDetails watch) throws IOException {
+-    for (ChangeBatch cb : watch.getResponsesList()) {
+-      for (Change ch : cb.getChangesList()) {
+-        if (ch.getState() != State.EXISTS) {
+-          continue;
+-        }
+-        Operation o = ch.getData().unpack(Operation.class);
+-        if (o.getResultCase() == ResultCase.ERROR && o.getError().getCode() != Code.OK.value()) {
+-          System.out.printf("Operation contained error: %s\n", o.getError().toString());
+-          return;
+-        } else if (o.getResultCase() == ResultCase.RESPONSE && o.getDone()) {
+-          System.out.println("ExecuteResponse extracted:");
+-          System.out.println(o.getResponse().unpack(ExecuteResponse.class).toString());
+-          return;
+-        }
+-      }
+-    }
+-    System.out.println("Could not find ExecuteResponse in Watch call details.");
+-  }
+-
+-  /** Print an individual log entry. */
+-  private static void printLogEntry(LogEntry entry) throws IOException {
+-    System.out.println(entry.toString());
+-    if (entry.getDetails().getDetailsCase() == DetailsCase.WATCH) {
+-      System.out.println("\nAttempted to extract ExecuteResponse from Watch call responses:");
+-      printExecuteResponse(entry.getDetails().getWatch());
+-    }
+-  }
+-
+-  /**
+-   * Prints each entry out individually (ungrouped) and a message at the end for how many entries
+-   * were printed/skipped.
+-   */
+-  private static void printEntriesInOrder(PrintLogCommand options) throws IOException {
+-    try (InputStream in = new FileInputStream(options.file)) {
+-      LogEntry entry;
+-      while ((entry = LogEntry.parseDelimitedFrom(in)) != null) {
+-        printLogEntry(entry);
+-        System.out.print(DELIMETER);
+-      }
+-    }
+-  }
+-
+-  /**
+-   * Gives comparator values for timestamps.
+-   *
+-   * @return {@code 0} if {@code t1} is equal to {@code t2}; a value less than {code 0} if {@code
+-   *     t1} occurs before {@code t2}; a value greater than {code 0} if {@code t1} occurs after
+-   *     {@code t2}.
+-   */
+-  private static int compareTimestamps(Timestamp t1, Timestamp t2) {
+-    int cmpSeconds = Long.compare(t1.getSeconds(), t2.getSeconds());
+-    return (cmpSeconds != 0) ? cmpSeconds : Integer.compare(t1.getNanos(), t2.getNanos());
+-  }
+-
+-  /**
+-   * Prints each entry in groups by action, and a message at the end for how many entries were
+-   * printed/skipped. If an entry does not have metadata to identify the action, is it skipped.
+-   *
+-   * <p>Entries for each action are printed in ascending order of their call started timestamps
+-   * (earliest first).
+-   */
+-  private static void printEntriesGroupedByAction(PrintLogCommand options) throws IOException {
+-    Map<String, Multiset<LogEntry>> actionMap = new HashMap<>();
+-    int numSkipped = 0;
+-    try (InputStream in = new FileInputStream(options.file)) {
+-      LogEntry entry;
+-      while ((entry = LogEntry.parseDelimitedFrom(in)) != null) {
+-        if (!entry.hasMetadata()) {
+-          numSkipped++;
+-          continue;
+-        }
+-        String hash = entry.getMetadata().getActionId();
+-        if (!actionMap.containsKey(hash)) {
+-          actionMap.put(
+-              hash,
+-              TreeMultiset.create((a, b) -> compareTimestamps(a.getStartTime(), b.getStartTime())));
+-        }
+-        actionMap.get(hash).add(entry);
+-      }
+-    }
+-    for (String hash : actionMap.keySet()) {
+-      System.out.printf("Entries for action with hash '%s'\n", hash);
+-      System.out.print(DELIMETER);
+-      for (LogEntry entry : actionMap.get(hash)) {
+-        printLogEntry(entry);
+-        System.out.print(DELIMETER);
+-      }
+-    }
+-    if (numSkipped > 0) {
+-      System.out.printf(
+-          "WARNING: Skipped %d entrie(s) due to absence of request metadata.\n", numSkipped);
+-    }
+-  }
+-
+-  /** Print log entries to standard output according to the command line arguments given. */
+-  public static void printLog(PrintLogCommand options) throws IOException {
+-    if (options.groupByAction) {
+-      printEntriesGroupedByAction(options);
+-    } else {
+-      printEntriesInOrder(options);
+-    }
+-  }
+-}
+diff --git a/src/main/java/com/google/devtools/build/remote/client/RemoteClient.java b/src/main/java/com/google/devtools/build/remote/client/RemoteClient.java
+index 08cc683..9176091 100644
+--- a/src/main/java/com/google/devtools/build/remote/client/RemoteClient.java
++++ b/src/main/java/com/google/devtools/build/remote/client/RemoteClient.java
+@@ -46,7 +46,6 @@ import com.google.protobuf.TextFormat;
+ import java.io.FileInputStream;
+ import java.io.FileOutputStream;
+ import java.io.IOException;
+-import io.grpc.StatusRuntimeException;
+ import io.grpc.Status;
+ import java.io.InputStreamReader;
+ import java.io.OutputStream;
+@@ -62,8 +61,6 @@ public class RemoteClient {
+ 
+   private final AbstractRemoteActionCache cache;
+   private final DigestUtil digestUtil;
+-  private static final String DELIMETER =
+-      "\n---------------------------------------------------------\n";
+ 
+   private RemoteClient(AbstractRemoteActionCache cache) {
+     this.cache = cache;
+@@ -323,8 +320,8 @@ public class RemoteClient {
+     return new RemoteClient(cache);
+   }
+ 
+-  private static void doPrintLog(PrintLogCommand options) throws IOException {
+-    LogPrintingUtils.printLog(options);
++  private static void doPrintLog(String grpcLogFile, PrintLogCommand options) throws IOException {
++    LogParserUtils.printLog(grpcLogFile, options);
+   }
+ 
+   private static void doLs(LsCommand options, RemoteClient client) throws IOException {
+@@ -383,6 +380,7 @@ public class RemoteClient {
+     Action.Builder builder = Action.newBuilder();
+     FileInputStream fin = new FileInputStream(options.file);
+     TextFormat.getParser().merge(new InputStreamReader(fin), builder);
++
+     client.printAction(builder.build(), options.limit);
+   }
+ 
+@@ -466,7 +464,7 @@ public class RemoteClient {
+ 
+     switch (optionsParser.getParsedCommand()) {
+       case "printlog":
+-        doPrintLog(printLogCommand);
++        doPrintLog(remoteClientOptions.grpcLog, printLogCommand);
+         break;
+       case "ls":
+         doLs(lsCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
+diff --git a/src/main/java/com/google/devtools/build/remote/client/RemoteClientOptions.java b/src/main/java/com/google/devtools/build/remote/client/RemoteClientOptions.java
+index 6a10702..19ec7f7 100644
+--- a/src/main/java/com/google/devtools/build/remote/client/RemoteClientOptions.java
++++ b/src/main/java/com/google/devtools/build/remote/client/RemoteClientOptions.java
+@@ -31,6 +31,12 @@ public final class RemoteClientOptions {
+   @Parameter(names = "--help", description = "This message.", help = true)
+   public boolean help;
+ 
++  @Parameter(
++      names = "--grpc_log",
++      description = "GRPC log to reference for additional information"
++  )
++  public String grpcLog = "";
++
+   @Parameters(
+     commandDescription = "Recursively lists a Directory in remote cache.",
+     separators = "="
+@@ -143,7 +149,6 @@ public final class RemoteClientOptions {
+   public static class ShowActionCommand {
+     @Parameter(
+       names = {"--textproto", "-p"},
+-      required = true,
+       converter = FileConverter.class,
+       description = "Path to a Action proto stored in protobuf text format."
+     )
+@@ -188,14 +193,6 @@ public final class RemoteClientOptions {
+     separators = "="
+   )
+   public static class PrintLogCommand {
+-    @Parameter(
+-      names = {"--file", "-f"},
+-      required = true,
+-      converter = FileConverter.class,
+-      description = "Path to log file."
+-    )
+-    public File file = null;
+-
+     @Parameter(
+       names = {"--group_by_action", "-g"},
+       description =
+-- 
+2.19.0.rc1.350.ge57e33dbd1-goog
+

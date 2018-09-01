@@ -46,7 +46,6 @@ import com.google.protobuf.TextFormat;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import io.grpc.StatusRuntimeException;
 import io.grpc.Status;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -62,8 +61,6 @@ public class RemoteClient {
 
   private final AbstractRemoteActionCache cache;
   private final DigestUtil digestUtil;
-  private static final String DELIMETER =
-      "\n---------------------------------------------------------\n";
 
   private RemoteClient(AbstractRemoteActionCache cache) {
     this.cache = cache;
@@ -323,8 +320,9 @@ public class RemoteClient {
     return new RemoteClient(cache);
   }
 
-  private static void doPrintLog(PrintLogCommand options) throws IOException {
-    LogPrintingUtils.printLog(options);
+  private static void doPrintLog(String grpcLogFile, PrintLogCommand options) throws IOException {
+    LogParserUtils parser = new LogParserUtils(grpcLogFile);
+    parser.printLog(options);
   }
 
   private static void doLs(LsCommand options, RemoteClient client) throws IOException {
@@ -383,6 +381,7 @@ public class RemoteClient {
     Action.Builder builder = Action.newBuilder();
     FileInputStream fin = new FileInputStream(options.file);
     TextFormat.getParser().merge(new InputStreamReader(fin), builder);
+
     client.printAction(builder.build(), options.limit);
   }
 
@@ -466,7 +465,7 @@ public class RemoteClient {
 
     switch (optionsParser.getParsedCommand()) {
       case "printlog":
-        doPrintLog(printLogCommand);
+        doPrintLog(remoteClientOptions.grpcLog, printLogCommand);
         break;
       case "ls":
         doLs(lsCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
