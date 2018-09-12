@@ -10,6 +10,7 @@ proto_library(
         "@googleapis//:google_longrunning_operations_proto",
         "@googleapis//:google_rpc_status_proto",
         "@googleapis//:google_watch_v1_proto",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_proto",
     ],
 )
 
