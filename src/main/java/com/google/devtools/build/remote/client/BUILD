@@ -15,6 +15,7 @@ java_library(
         "//3rdparty/jvm/com/google/code/findbugs:jsr305",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",
         "//3rdparty/jvm/io/grpc:grpc_auth",
         "//3rdparty/jvm/io/grpc:grpc_context",
         "//3rdparty/jvm/io/grpc:grpc_core",

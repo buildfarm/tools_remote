@@ -6,6 +6,7 @@ import com.google.common.collect.Multiset;
 import com.google.common.collect.TreeMultiset;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
 import com.google.protobuf.Timestamp;
+import com.google.protobuf.util.Timestamps;
 import java.io.BufferedWriter;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -21,23 +22,9 @@ import java.util.Map;
  */
 final class ActionGrouping {
 
-  /**
-   * Gives comparator values for timestamps.
-   *
-   * @return {@code 0} if {@code t1} is equal to {@code t2}; a value less than {code 0} if {@code
-   * t1} occurs before {@code t2}; a value greater than {code 0} if {@code t1} occurs after {@code
-   * t2}.
-   */
-  private static int compareTimestamps(Timestamp t1, Timestamp t2) {
-    int cmpSeconds = Long.compare(t1.getSeconds(), t2.getSeconds());
-    return (cmpSeconds != 0) ? cmpSeconds : Integer.compare(t1.getNanos(), t2.getNanos());
-  }
-
+  // Key: actionId; Value: a set of associated log entries.
   Map<String, Multiset<LogEntry>> actionMap = new HashMap<>();
   int numSkipped = 0;
-
-  public ActionGrouping() {
-  }
 
   public void addLogEntry(LogEntry entry) {
     if (!entry.hasMetadata()) {
@@ -48,7 +35,7 @@ final class ActionGrouping {
     if (!actionMap.containsKey(hash)) {
       actionMap.put(
           hash,
-          TreeMultiset.create((a, b) -> compareTimestamps(a.getStartTime(), b.getStartTime())));
+          TreeMultiset.create((a, b) -> Timestamps.compare(a.getStartTime(), b.getStartTime())));
     }
     actionMap.get(hash).add(entry);
   }

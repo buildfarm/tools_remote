@@ -61,11 +61,11 @@ public class LogParserUtils {
     this.filename = filename;
   }
 
-  private String getFilename() throws ParamException {
+  private FileInputStream openGrpcFileInputStream() throws ParamException, IOException {
     if (filename.isEmpty()) {
       throw new ParamException("This operation cannot be performed without specifying --grpc_log.");
     }
-    return filename;
+    return new FileInputStream(filename);
   }
 
 
@@ -110,7 +110,7 @@ public class LogParserUtils {
    * were printed/skipped.
    */
   private void printEntriesInOrder(OutputStream outStream) throws IOException, ParamException {
-    try (InputStream in = new FileInputStream(getFilename())) {
+    try (InputStream in = openGrpcFileInputStream()) {
       PrintWriter out =
           new PrintWriter(new BufferedWriter(new OutputStreamWriter(outStream, UTF_8)), true);
       LogEntry entry;
@@ -124,8 +124,7 @@ public class LogParserUtils {
   private void printEntriesGroupedByAction(OutputStream outStream)
       throws IOException, ParamException {
     ActionGrouping byAction = new ActionGrouping();
-    ;
-    try (InputStream in = new FileInputStream(getFilename())) {
+    try (InputStream in = openGrpcFileInputStream()) {
       LogEntry entry;
       while ((entry = LogEntry.parseDelimitedFrom(in)) != null) {
         byAction.addLogEntry(entry);
