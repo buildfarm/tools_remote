@@ -20,7 +20,7 @@ import com.beust.jcommander.ParameterException;
 import com.beust.jcommander.Parameters;
 import com.beust.jcommander.converters.FileConverter;
 import com.beust.jcommander.converters.PathConverter;
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Digest;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -149,11 +149,17 @@ public final class RemoteClientOptions {
   public static class ShowActionCommand {
     @Parameter(
       names = {"--textproto", "-p"},
-      required = true,
       converter = FileConverter.class,
-      description = "Path to a Action proto stored in protobuf text format."
+      description = "Path to a V1 Action proto stored in protobuf text format."
     )
     public File file = null;
+
+    @Parameter(
+        names = {"--digest", "-d"},
+        converter = DigestConverter.class,
+        description = "Action digest in the form hex_hash/size_bytes. Use for V2 API."
+    )
+    public Digest actionDigest = null;
 
     @Parameter(
       names = {"--limit", "-l"},
@@ -177,13 +183,6 @@ public final class RemoteClientOptions {
       description = "The maximum number of output files to list."
     )
     public int limit = 100;
-
-    @Parameter(
-      names = {"--show_raw_output", "-r"},
-      description =
-          "Print OutputFile contents if they were returned as raw bytes in the given ActionResult."
-    )
-    public boolean showRawOutputs = false;
   }
 
   @Parameters(
@@ -214,12 +213,18 @@ public final class RemoteClientOptions {
   public static class RunCommand {
     @Parameter(
       names = {"--textproto", "-p"},
-      required = true,
       converter = FileConverter.class,
       description =
           "Path to the Action proto stored in protobuf text format to be run in the " + "container."
     )
     public File file = null;
+
+    @Parameter(
+        names = {"--digest", "-d"},
+        converter = DigestConverter.class,
+        description = "Action digest in the form hex_hash/size_bytes. Use for V2 API."
+    )
+    public Digest actionDigest = null;
 
     @Parameter(
       names = {"--path", "-o"},

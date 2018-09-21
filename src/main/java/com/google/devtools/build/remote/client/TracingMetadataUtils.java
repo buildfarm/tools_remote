@@ -14,7 +14,7 @@
 package com.google.devtools.build.remote.client;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.devtools.remoteexecution.v1test.RequestMetadata;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import io.grpc.ClientInterceptor;
 import io.grpc.Context;
 import io.grpc.Metadata;

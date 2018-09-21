@@ -29,24 +29,26 @@ import com.google.devtools.build.remote.client.RemoteClientOptions.PrintLogComma
 import com.google.devtools.build.remote.client.RemoteClientOptions.RunCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.ShowActionCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.ShowActionResultCommand;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Command;
-import com.google.devtools.remoteexecution.v1test.Command.EnvironmentVariable;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.DirectoryNode;
-import com.google.devtools.remoteexecution.v1test.FileNode;
-import com.google.devtools.remoteexecution.v1test.OutputDirectory;
-import com.google.devtools.remoteexecution.v1test.OutputFile;
-import com.google.devtools.remoteexecution.v1test.RequestMetadata;
-import com.google.devtools.remoteexecution.v1test.ToolDetails;
-import com.google.devtools.remoteexecution.v1test.Tree;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.DirectoryNode;
+import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.OutputDirectory;
+import build.bazel.remote.execution.v2.OutputFile;
+import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.ToolDetails;
+import build.bazel.remote.execution.v2.Tree;
 import com.google.protobuf.TextFormat;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import io.grpc.Status;
+import java.io.File;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.file.FileSystemAlreadyExistsException;
@@ -173,21 +175,35 @@ public class RemoteClient {
     }
   }
 
+  private static Digest toV2(com.google.devtools.remoteexecution.v1test.Digest d) {
+    return Digest.newBuilder().setHash(d.getHash()).setSizeBytes(d.getSizeBytes()).build();
+  }
+
+  private static Platform toV2(com.google.devtools.remoteexecution.v1test.Platform p) {
+    //return Digest.newBuilder().setHash(d.getHash()).setSizeBytes(d.getSizeBytes()).build();
+    Platform.Builder builder = Platform.newBuilder();
+    for(com.google.devtools.remoteexecution.v1test.Platform.Property property : p.getPropertiesList()) {
+      builder.addProperties(Platform.Property.newBuilder().setName(property.getName()).setValue(property.getValue()));
+    }
+    return builder.build();
+  }
+
   // Output for print action command.
-  private void printAction(Action action, int limit) throws IOException {
+  private void printActionV1(com.google.devtools.remoteexecution.v1test.Action action, int limit) throws IOException {
+    // Note: Command V2 is backward compatible to V1. It adds fields but does not remove them, so we can use it here.
     Command command;
     try {
-      command = Command.parseFrom(cache.downloadBlob(action.getCommandDigest()));
+      command = Command.parseFrom(cache.downloadBlob(toV2(action.getCommandDigest())));
     } catch (IOException e) {
       throw new IOException("Could not obtain Command from digest.", e);
     }
-    System.out.printf("Command [digest: %s]:\n", digestUtil.toString(action.getCommandDigest()));
+    System.out.printf("Command [digest: %s]:\n", digestUtil.toString(toV2(action.getCommandDigest())));
     printCommand(command);
 
-    Tree tree = cache.getTree(action.getInputRootDigest());
+    Tree tree = cache.getTree(toV2(action.getInputRootDigest()));
     System.out.printf(
         "\nInput files [total: %d, root Directory digest: %s]:\n",
-        getNumFiles(tree), digestUtil.toString(action.getInputRootDigest()));
+        getNumFiles(tree), digestUtil.toString(toV2(action.getInputRootDigest())));
     listTree(Paths.get(""), tree, limit);
 
     System.out.println("\nOutput files:");
@@ -204,32 +220,70 @@ public class RemoteClient {
     }
   }
 
+  private Action getAction(Digest actionDigest) throws IOException {
+    Action action;
+    try {
+      action = Action.parseFrom(cache.downloadBlob(actionDigest));
+    } catch (IOException e) {
+      throw new IOException("Could not obtain Action from digest.", e);
+    }
+    return action;
+  }
+
+  // Output for print action command.
+  private void printAction(Digest actionDigest, int limit) throws IOException {
+    Action action = getAction(actionDigest);
+
+    Command command;
+    try {
+      command = Command.parseFrom(cache.downloadBlob(action.getCommandDigest()));
+    } catch (IOException e) {
+      throw new IOException("Could not obtain Command from digest.", e);
+    }
+    System.out.printf("Command [digest: %s]:\n", digestUtil.toString(action.getCommandDigest()));
+    printCommand(command);
+
+    Tree tree = cache.getTree(action.getInputRootDigest());
+    System.out.printf(
+        "\nInput files [total: %d, root Directory digest: %s]:\n",
+        getNumFiles(tree), digestUtil.toString(action.getInputRootDigest()));
+    listTree(Paths.get(""), tree, limit);
+
+    System.out.println("\nOutput files:");
+    printList(command.getOutputFilesList(), limit);
+
+    System.out.println("\nOutput directories:");
+    printList(command.getOutputDirectoriesList(), limit);
+
+    System.out.println("\nPlatform:");
+    if (command.hasPlatform() && !command.getPlatform().getPropertiesList().isEmpty()) {
+      System.out.println(command.getPlatform().toString());
+    } else {
+      System.out.println("(none)");
+    }
+  }
+
   // Display output file (either digest or raw bytes).
-  private void printOutputFile(OutputFile file, boolean showRawOutputs) {
+  private void printOutputFile(OutputFile file) {
     String contentString;
     if (file.hasDigest()) {
       contentString = "Content digest: " + digestUtil.toString(file.getDigest());
-    } else if (showRawOutputs) {
-      contentString =
-          String.format(
-              "Raw contents: '%s', size (bytes): %d",
-              file.getContent().toStringUtf8(), file.getContent().size());
     } else {
-      contentString = "Raw contents (not printed)";
+      contentString = "No digest included.";
     }
     System.out.printf(
         "%s [%s, executable: %b]\n", file.getPath(), contentString, file.getIsExecutable());
   }
 
   // Output for print action result command.
-  private void printActionResult(ActionResult result, int limit, boolean showRawOutputs)
+  private void printActionResult(ActionResult result, int limit)
       throws IOException {
     System.out.println("Output files:");
     result
         .getOutputFilesList()
         .stream()
         .limit(limit)
-        .forEach(name -> printOutputFile(name, showRawOutputs));
+        .forEach(name -> printOutputFile(name));
     if (result.getOutputFilesList().size() > limit) {
       System.out.println(" ... (too many to list, some omitted)");
     } else if (result.getOutputFilesList().isEmpty()) {
@@ -266,37 +320,64 @@ public class RemoteClient {
 
   // Given a docker run action, sets up a directory for an Action to be run in (download Action
   // inputs, set up output directories), and display a docker command that will run the Action.
+  private void setupDocker(com.google.devtools.remoteexecution.v1test.Action action, Path root) throws IOException {
+    com.google.devtools.remoteexecution.v1test.Command command;
+    try {
+      command = com.google.devtools.remoteexecution.v1test.Command.parseFrom(cache.downloadBlob(toV2(action.getCommandDigest())));
+    } catch (IOException e) {
+      throw new IOException("Failed to get Command for Action.", e);
+    }
+    Command.Builder builder = Command.newBuilder()
+        .addAllArguments(command.getArgumentsList())
+        .addAllOutputFiles(action.getOutputFilesList())
+        .addAllOutputDirectories(action.getOutputDirectoriesList());
+    for(com.google.devtools.remoteexecution.v1test.Command.EnvironmentVariable var : command.getEnvironmentVariablesList()) {
+      builder.addEnvironmentVariables(Command.EnvironmentVariable.newBuilder().setName(var.getName()).setValue(var.getValue()).build());
+    }
+    if(action.hasPlatform()) {
+      builder.setPlatform(toV2(action.getPlatform()));
+    }
+
+    setupDocker(builder.build(), toV2(action.getInputRootDigest()), root);
+  }
+
+  // Given a docker run action, sets up a directory for an Action to be run in (download Action
+  // inputs, set up output directories), and display a docker command that will run the Action.
   private void setupDocker(Action action, Path root) throws IOException {
-    System.out.printf("Setting up Action in directory %s...\n", root.toAbsolutePath());
     Command command;
     try {
       command = Command.parseFrom(cache.downloadBlob(action.getCommandDigest()));
     } catch (IOException e) {
       throw new IOException("Failed to get Command for Action.", e);
     }
+    setupDocker(command, action.getInputRootDigest(), root);
+  }
+
+  private void setupDocker(Command command, Digest inputRootDigest, Path root) throws IOException {
+    System.out.printf("Setting up Action in directory %s...\n", root.toAbsolutePath());
 
     try {
-      cache.downloadDirectory(root, action.getInputRootDigest());
+      cache.downloadDirectory(root, inputRootDigest);
     } catch (IOException e) {
       throw new IOException("Failed to download action inputs.", e);
     }
 
     // Setup directory structure for outputs.
-    for (String output : action.getOutputFilesList()) {
+    for (String output : command.getOutputFilesList()) {
       Path file = root.resolve(output);
       if (java.nio.file.Files.exists(file)) {
         throw new FileSystemAlreadyExistsException("Output file already exists: " + file);
       }
       Files.createParentDirs(file.toFile());
     }
-    for (String output : action.getOutputDirectoriesList()) {
+    for (String output : command.getOutputDirectoriesList()) {
       Path dir = root.resolve(output);
       if (java.nio.file.Files.exists(dir)) {
         throw new FileSystemAlreadyExistsException("Output directory already exists: " + dir);
       }
       java.nio.file.Files.createDirectories(dir);
     }
-    String dockerCommand = DockerUtil.getDockerCommand(action, command, root.toString());
+    String dockerCommand = DockerUtil.getDockerCommand(command, root.toString());
     System.out.println("\nSuccessfully setup Action in directory " + root.toString() + ".");
     System.out.println("\nTo run the Action locally, run:");
     System.out.println("  " + dockerCommand);
@@ -376,13 +457,27 @@ public class RemoteClient {
     }
   }
 
+  private static void doShowActionV1(File file, int limit, RemoteClient client) throws IOException {
+    com.google.devtools.remoteexecution.v1test.Action.Builder builder = com.google.devtools.remoteexecution.v1test.Action.newBuilder();
+    FileInputStream fin = new FileInputStream(file);
+    TextFormat.getParser().merge(new InputStreamReader(fin), builder);
+    client.printActionV1(builder.build(), limit);
+  }
+
   private static void doShowAction(ShowActionCommand options, RemoteClient client)
       throws IOException {
-    Action.Builder builder = Action.newBuilder();
-    FileInputStream fin = new FileInputStream(options.file);
-    TextFormat.getParser().merge(new InputStreamReader(fin), builder);
-
-    client.printAction(builder.build(), options.limit);
+    if(options.file != null && options.actionDigest != null) {
+      System.err.println("Only one of --file or --action_digest should be specified");
+      System.exit(1);
+    }
+    if(options.file != null) {
+      doShowActionV1(options.file, options.limit, client);
+    } else if(options.actionDigest != null) {
+      client.printAction(options.actionDigest, options.limit);
+    } else {
+      System.err.println("Specify --file or --action_digest");
+      System.exit(1);
+    }
   }
 
   private static void doShowActionResult(ShowActionResultCommand options, RemoteClient client)
@@ -390,15 +485,29 @@ public class RemoteClient {
     ActionResult.Builder builder = ActionResult.newBuilder();
     FileInputStream fin = new FileInputStream(options.file);
     TextFormat.getParser().merge(new InputStreamReader(fin), builder);
-    client.printActionResult(builder.build(), options.limit, options.showRawOutputs);
+    client.printActionResult(builder.build(), options.limit);
   }
 
   private static void doRun(RunCommand options, RemoteClient client) throws IOException {
-    Action.Builder builder = Action.newBuilder();
-    FileInputStream fin = new FileInputStream(options.file);
-    TextFormat.getParser().merge(new InputStreamReader(fin), builder);
-    client.setupDocker(
-        builder.build(), options.path != null ? options.path : Files.createTempDir().toPath());
+    Path path = options.path != null ? options.path : Files.createTempDir().toPath();
+
+    if(options.file != null && options.actionDigest != null) {
+      System.err.println("Only one of --file or --action_digest should be specified");
+      System.exit(1);
+    }
+    if(options.file != null) {
+      com.google.devtools.remoteexecution.v1test.Action.Builder builder = com.google.devtools.remoteexecution.v1test.Action.newBuilder();
+      try (FileInputStream fin = new FileInputStream(options.file)) {
+        TextFormat.getParser().merge(new InputStreamReader(fin), builder);
+      }
+      client.setupDocker(
+          builder.build(), path);
+    } else if(options.actionDigest != null) {
+      client.setupDocker(client.getAction(options.actionDigest), path);
+    } else {
+      System.err.println("Specify --file or --action_digest");
+      System.exit(1);
+    }
   }
 
   public static void main(String[] args) throws Exception {
@@ -490,7 +599,7 @@ public class RemoteClient {
             showActionResultCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
         break;
       case "run":
-        doRun(runCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
+          doRun(runCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
         break;
       default:
         throw new IllegalArgumentException("Unknown command.");

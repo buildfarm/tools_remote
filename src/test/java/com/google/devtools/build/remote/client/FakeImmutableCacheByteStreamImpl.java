@@ -19,7 +19,7 @@ import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.common.collect.ImmutableMap;
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Digest;
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import java.util.HashMap;

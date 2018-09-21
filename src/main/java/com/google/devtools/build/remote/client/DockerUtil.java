@@ -14,10 +14,10 @@
 package com.google.devtools.build.remote.client;
 
 import com.google.common.io.ByteStreams;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.Command;
-import com.google.devtools.remoteexecution.v1test.Command.EnvironmentVariable;
-import com.google.devtools.remoteexecution.v1test.Platform;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
+import build.bazel.remote.execution.v2.Platform;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -51,17 +51,17 @@ public final class DockerUtil {
   /**
    * Checks Action for Docker container definition.
    *
-   * @return The docker container for the Action. If no container could be found, returns null.
+   * @return The docker container for the command. If no container could be found, returns null.
    */
-  private static @Nullable String dockerContainer(Action action) {
+  private static @Nullable String dockerContainer(Command command) {
     String result = null;
-    for (Platform.Property property : action.getPlatform().getPropertiesList()) {
+    for (Platform.Property property : command.getPlatform().getPropertiesList()) {
       if (property.getName().equals(CONTAINER_IMAGE_ENTRY_NAME)) {
         if (result != null) {
           // Multiple container name entries
           throw new IllegalArgumentException(
               String.format(
-                  "Multiple entries for %s in action.Platform", CONTAINER_IMAGE_ENTRY_NAME));
+                  "Multiple entries for %s in command.Platform", CONTAINER_IMAGE_ENTRY_NAME));
         }
         result = property.getValue();
         if (!result.startsWith(DOCKER_IMAGE_PREFIX)) {
@@ -86,10 +86,10 @@ public final class DockerUtil {
    * @param workingPath The path that is to be the working directory that the Action is to be
    *     executed in.
    */
-  public static String getDockerCommand(Action action, Command command, String workingPath) {
-    String container = dockerContainer(action);
+  public static String getDockerCommand(Command command, String workingPath) {
+    String container = dockerContainer(command);
     if (container == null) {
-      throw new IllegalArgumentException("No docker image specified in given Action.");
+      throw new IllegalArgumentException("No docker image specified in given Command.");
     }
     List<String> commandElements = new ArrayList<>();
     commandElements.add("docker");

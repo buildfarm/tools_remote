@@ -1,5 +1,16 @@
 licenses(["notice"])  # Apache 2.0
 
+load("@//third_party/grpc_java:java_grpc_library.bzl", "java_grpc_library")
+
+java_grpc_library(
+    name = "remote_execution_java_grpc",
+    srcs = ["@remoteapis//build/bazel/remote/execution/v2:remote_execution_proto"],
+    deps = [
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
+        "@googleapis//:google_longrunning_operations_java_proto",
+    ],
+)
+
 java_library(
     name = "client",
     srcs = glob(["*.java"]),
@@ -30,6 +41,7 @@ java_library(
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_watch_v1_java_proto",
+        ":remote_execution_java_grpc",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )

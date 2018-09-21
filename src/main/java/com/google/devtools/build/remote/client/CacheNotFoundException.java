@@ -14,7 +14,7 @@
 
 package com.google.devtools.build.remote.client;
 
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Digest;
 import java.io.IOException;
 
 /**

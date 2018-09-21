@@ -18,13 +18,13 @@ import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
-import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc;
-import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.GetTreeRequest;
-import com.google.devtools.remoteexecution.v1test.GetTreeResponse;
-import com.google.devtools.remoteexecution.v1test.Tree;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.GetTreeRequest;
+import build.bazel.remote.execution.v2.GetTreeResponse;
+import build.bazel.remote.execution.v2.Tree;
 import io.grpc.CallCredentials;
 import io.grpc.Channel;
 import io.grpc.Status;
@@ -97,19 +97,23 @@ public class GrpcRemoteCache extends AbstractRemoteActionCache {
     } catch (IOException e) {
       throw new IOException("Failed to download root Directory of tree.", e);
     }
+
     Tree.Builder result = Tree.newBuilder().setRoot(dir);
+
+    GetTreeRequest.Builder requestBuilder =
+        GetTreeRequest.newBuilder()
+            .setRootDigest(rootDigest)
+            .setInstanceName(options.remoteInstanceName);
+
+
     GetTreeResponse response = null;
-    while (response == null || !response.getNextPageToken().isEmpty()) {
-      GetTreeRequest.Builder requestBuilder =
-          GetTreeRequest.newBuilder()
-              .setRootDigest(rootDigest)
-              .setInstanceName(options.remoteInstanceName);
-      if (response != null) {
-        requestBuilder.setPageToken(response.getNextPageToken());
-      }
-      response = casBlockingStub().getTree(requestBuilder.build());
+    Iterator<GetTreeResponse> responses = casBlockingStub().getTree(requestBuilder.build());
+    while(responses.hasNext()) {
+      response = responses.next();
+      //responses.remove();
       result.addAllChildren(response.getDirectoriesList());
     }
+
     return result.build();
   }
 
