@@ -17,9 +17,9 @@ package com.google.devtools.build.remote.client;
 import static com.google.common.io.MoreFiles.asByteSource;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import build.bazel.remote.execution.v2.Digest;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.HashFunction;
-import build.bazel.remote.execution.v2.Digest;
 import com.google.protobuf.Message;
 import java.io.IOException;
 import java.nio.file.Files;

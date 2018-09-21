@@ -13,8 +13,8 @@
 // limitations under the License.
 package com.google.devtools.build.remote.client;
 
-import com.google.common.annotations.VisibleForTesting;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import com.google.common.annotations.VisibleForTesting;
 import io.grpc.ClientInterceptor;
 import io.grpc.Context;
 import io.grpc.Metadata;

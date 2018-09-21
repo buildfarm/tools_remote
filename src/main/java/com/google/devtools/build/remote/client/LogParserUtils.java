@@ -16,16 +16,12 @@ package com.google.devtools.build.remote.client;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.ExecuteDetails;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
-import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.RpcCallDetails.DetailsCase;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.V1WatchDetails;
 import com.google.devtools.build.remote.client.RemoteClientOptions.PrintLogCommand;
 import com.google.longrunning.Operation;
 import com.google.longrunning.Operation.ResultCase;
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
-import com.google.protobuf.Timestamp;
 import com.google.watcher.v1.Change;
 import com.google.watcher.v1.Change.State;
 import com.google.watcher.v1.ChangeBatch;
@@ -37,13 +33,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-/**
- * Methods for printing log files.
- */
+/** Methods for printing log files. */
 public class LogParserUtils {
 
   private static final String DELIMETER =
@@ -69,8 +61,8 @@ public class LogParserUtils {
     return new FileInputStream(filename);
   }
 
-  private static <T extends Message> boolean maybePrintOperation(Operation o, PrintWriter out, Class<T> t)
-      throws IOException {
+  private static <T extends Message> boolean maybePrintOperation(
+      Operation o, PrintWriter out, Class<T> t) throws IOException {
     if (o.getResultCase() == ResultCase.ERROR && o.getError().getCode() != Code.OK.value()) {
       out.printf("Operation contained error: %s\n", o.getError().toString());
       return true;
@@ -87,7 +79,8 @@ public class LogParserUtils {
    * no Operation could be found in the Watch call responses, or an Operation was found but failed,
    * a failure message is printed.
    */
-  private static void printExecuteResponse(V1WatchDetails watch, PrintWriter out) throws IOException {
+  private static void printExecuteResponse(V1WatchDetails watch, PrintWriter out)
+      throws IOException {
     boolean foundWatch = false;
     for (ChangeBatch cb : watch.getResponsesList()) {
       for (Change ch : cb.getChangesList()) {
@@ -95,39 +88,41 @@ public class LogParserUtils {
           continue;
         }
         Operation o = ch.getData().unpack(Operation.class);
-        foundWatch = foundWatch || maybePrintOperation(o, out, com.google.devtools.remoteexecution.v1test.ExecuteResponse.class);
+        foundWatch =
+            foundWatch
+                || maybePrintOperation(
+                    o, out, com.google.devtools.remoteexecution.v1test.ExecuteResponse.class);
       }
     }
-    if(!foundWatch) {
+    if (!foundWatch) {
       out.println("Could not find ExecuteResponse in Watch call details.");
     }
   }
 
-  /**
-   * Print execute responses or errors contained in the given list of operations.
-   */
-  private static void printExecuteResponse(List<Operation> operations, PrintWriter out) throws IOException {
+  /** Print execute responses or errors contained in the given list of operations. */
+  private static void printExecuteResponse(List<Operation> operations, PrintWriter out)
+      throws IOException {
     for (Operation o : operations) {
       maybePrintOperation(o, out, build.bazel.remote.execution.v2.ExecuteResponse.class);
     }
   }
-  /**
-   * Print an individual log entry.
-   */
+  /** Print an individual log entry. */
   static void printLogEntry(LogEntry entry, PrintWriter out) throws IOException {
     out.println(entry.toString());
 
-    switch(entry.getDetails().getDetailsCase()) {
+    switch (entry.getDetails().getDetailsCase()) {
       case V1_WATCH:
         out.println("\nAttempted to extract ExecuteResponse from Watch call responses:");
         printExecuteResponse(entry.getDetails().getV1Watch(), out);
         break;
       case EXECUTE:
-        out.println("\nAttempted to extract ExecuteResponse from streaming Execute call responses:");
+        out.println(
+            "\nAttempted to extract ExecuteResponse from streaming Execute call responses:");
         printExecuteResponse(entry.getDetails().getExecute().getResponsesList(), out);
         break;
       case WAIT_EXECUTION:
-        out.println("\nAttempted to extract ExecuteResponse from streaming WaitExecution call responses:");
+        out.println(
+            "\nAttempted to extract ExecuteResponse from streaming WaitExecution call responses:");
         printExecuteResponse(entry.getDetails().getWaitExecution().getResponsesList(), out);
         break;
     }
@@ -163,10 +158,7 @@ public class LogParserUtils {
     byAction.printByAction(out);
   }
 
-
-  /**
-   * Print log entries to standard output according to the command line arguments given.
-   */
+  /** Print log entries to standard output according to the command line arguments given. */
   public void printLog(PrintLogCommand options) throws IOException {
     try {
       if (options.groupByAction) {

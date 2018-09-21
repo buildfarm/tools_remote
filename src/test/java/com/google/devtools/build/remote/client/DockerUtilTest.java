@@ -15,12 +15,12 @@ package com.google.devtools.build.remote.client;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import com.google.common.hash.Hashing;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
+import com.google.common.hash.Hashing;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;

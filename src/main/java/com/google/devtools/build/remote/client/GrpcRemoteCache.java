@@ -14,10 +14,6 @@
 
 package com.google.devtools.build.remote.client;
 
-import com.google.bytestream.ByteStreamGrpc;
-import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
-import com.google.bytestream.ByteStreamProto.ReadRequest;
-import com.google.bytestream.ByteStreamProto.ReadResponse;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
 import build.bazel.remote.execution.v2.Digest;
@@ -25,6 +21,10 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.bazel.remote.execution.v2.Tree;
+import com.google.bytestream.ByteStreamGrpc;
+import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
+import com.google.bytestream.ByteStreamProto.ReadRequest;
+import com.google.bytestream.ByteStreamProto.ReadResponse;
 import io.grpc.CallCredentials;
 import io.grpc.Channel;
 import io.grpc.Status;
@@ -105,12 +105,11 @@ public class GrpcRemoteCache extends AbstractRemoteActionCache {
             .setRootDigest(rootDigest)
             .setInstanceName(options.remoteInstanceName);
 
-
     GetTreeResponse response = null;
     Iterator<GetTreeResponse> responses = casBlockingStub().getTree(requestBuilder.build());
-    while(responses.hasNext()) {
+    while (responses.hasNext()) {
       response = responses.next();
-      //responses.remove();
+      // responses.remove();
       result.addAllChildren(response.getDirectoriesList());
     }
 

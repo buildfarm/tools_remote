@@ -13,11 +13,10 @@
 // limitations under the License.
 package com.google.devtools.build.remote.client;
 
-import com.google.common.io.ByteStreams;
-import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.Platform;
+import com.google.common.io.ByteStreams;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;

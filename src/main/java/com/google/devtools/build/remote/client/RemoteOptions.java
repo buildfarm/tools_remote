@@ -21,29 +21,25 @@ import com.beust.jcommander.Parameters;
 @Parameters(separators = "=")
 public final class RemoteOptions {
   @Parameter(
-    names = "--remote_http_cache",
-    description =
-        "A base URL of a HTTP caching service. Both http:// and https:// are supported. BLOBs are "
-            + "are stored with PUT and retrieved with GET. See remote/README.md for more"
-            + "information."
-  )
+      names = "--remote_http_cache",
+      description =
+          "A base URL of a HTTP caching service. Both http:// and https:// are supported. BLOBs are "
+              + "are stored with PUT and retrieved with GET. See remote/README.md for more"
+              + "information.")
   public String remoteHttpCache = null;
 
   @Parameter(
-    names = "--remote_cache",
-    description = "HOST or HOST:PORT of a remote caching endpoint."
-  )
+      names = "--remote_cache",
+      description = "HOST or HOST:PORT of a remote caching endpoint.")
   public String remoteCache = null;
 
   @Parameter(
-    names = "--remote_timeout",
-    description = "The maximum number of seconds to wait for remote execution and cache calls."
-  )
+      names = "--remote_timeout",
+      description = "The maximum number of seconds to wait for remote execution and cache calls.")
   public int remoteTimeout = 60;
 
   @Parameter(
-    names = "--remote_instance_name",
-    description = "Value to pass as instance_name in the remote execution API."
-  )
+      names = "--remote_instance_name",
+      description = "Value to pass as instance_name in the remote execution API.")
   public String remoteInstanceName = "";
 }
