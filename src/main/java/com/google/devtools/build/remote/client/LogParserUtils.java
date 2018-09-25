@@ -81,22 +81,18 @@ public class LogParserUtils {
    */
   private static void printExecuteResponse(V1WatchDetails watch, PrintWriter out)
       throws IOException {
-    boolean foundWatch = false;
     for (ChangeBatch cb : watch.getResponsesList()) {
       for (Change ch : cb.getChangesList()) {
         if (ch.getState() != State.EXISTS) {
           continue;
         }
         Operation o = ch.getData().unpack(Operation.class);
-        foundWatch =
-            foundWatch
-                || maybePrintOperation(
-                    o, out, com.google.devtools.remoteexecution.v1test.ExecuteResponse.class);
+        maybePrintOperation(
+            o, out, com.google.devtools.remoteexecution.v1test.ExecuteResponse.class);
+        return;
       }
     }
-    if (!foundWatch) {
-      out.println("Could not find ExecuteResponse in Watch call details.");
-    }
+    out.println("Could not find ExecuteResponse in Watch call details.");
   }
 
   /** Print execute responses or errors contained in the given list of operations. */

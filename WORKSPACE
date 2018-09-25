@@ -26,10 +26,10 @@ new_http_archive(
 
 new_http_archive(
     name = "remoteapis",
-    sha256 = "073866e554fa47d098bb970d2ae8b2679c8cdd0563c2ef6030abfec46503e2b5",
-    url = "https://github.com/bazelbuild/remote-apis/archive/remote-apis-6130f7e23ae157d5cf12c5d6af325a1dae57e235.zip",
-    strip_prefix = "remote-apis-6130f7e23ae157d5cf12c5d6af325a1dae57e235",
-    build_file = "BUILD.googleapis",
+    sha256 = "8ddb673b1346cc7c664bc3ff8b01060b2d2b5eede36d26439e2f1c658d8143f4",
+    url = "https://github.com/bazelbuild/remote-apis/archive/998b8625d5947f272142037a1e52a61be33fcefb.zip",
+    strip_prefix = "remote-apis-998b8625d5947f272142037a1e52a61be33fcefb",
+    build_file = "BUILD.remoteapis",
 )
 
 load("//3rdparty:workspace.bzl", "maven_dependencies", "declare_maven")

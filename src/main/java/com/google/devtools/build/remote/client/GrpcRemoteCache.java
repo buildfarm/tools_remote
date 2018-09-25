@@ -105,12 +105,9 @@ public class GrpcRemoteCache extends AbstractRemoteActionCache {
             .setRootDigest(rootDigest)
             .setInstanceName(options.remoteInstanceName);
 
-    GetTreeResponse response = null;
     Iterator<GetTreeResponse> responses = casBlockingStub().getTree(requestBuilder.build());
     while (responses.hasNext()) {
-      response = responses.next();
-      // responses.remove();
-      result.addAllChildren(response.getDirectoriesList());
+      result.addAllChildren(responses.next().getDirectoriesList());
     }
 
     return result.build();

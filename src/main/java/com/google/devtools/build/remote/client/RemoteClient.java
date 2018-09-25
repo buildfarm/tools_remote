@@ -175,19 +175,16 @@ public class RemoteClient {
     }
   }
 
-  private static Digest toV2(com.google.devtools.remoteexecution.v1test.Digest d) {
-    return Digest.newBuilder().setHash(d.getHash()).setSizeBytes(d.getSizeBytes()).build();
+  private static Digest toV2(com.google.devtools.remoteexecution.v1test.Digest d)
+      throws IOException {
+    // Digest is binary compatible between v1 and v2
+    return Digest.parseFrom(d.toByteArray());
   }
 
-  private static Platform toV2(com.google.devtools.remoteexecution.v1test.Platform p) {
-    // return Digest.newBuilder().setHash(d.getHash()).setSizeBytes(d.getSizeBytes()).build();
-    Platform.Builder builder = Platform.newBuilder();
-    for (com.google.devtools.remoteexecution.v1test.Platform.Property property :
-        p.getPropertiesList()) {
-      builder.addProperties(
-          Platform.Property.newBuilder().setName(property.getName()).setValue(property.getValue()));
-    }
-    return builder.build();
+  private static Platform toV2(com.google.devtools.remoteexecution.v1test.Platform p)
+      throws IOException {
+    // Platform is binary compatible between v1 and v2
+    return Platform.parseFrom(p.toByteArray());
   }
 
   // Output for print action command.
@@ -195,12 +192,7 @@ public class RemoteClient {
       throws IOException {
     // Note: Command V2 is backward compatible to V1. It adds fields but does not remove them, so we
     // can use it here.
-    Command command;
-    try {
-      command = Command.parseFrom(cache.downloadBlob(toV2(action.getCommandDigest())));
-    } catch (IOException e) {
-      throw new IOException("Could not obtain Command from digest.", e);
-    }
+    Command command = getCommand(toV2(action.getCommandDigest()));
     System.out.printf(
         "Command [digest: %s]:\n", digestUtil.toString(toV2(action.getCommandDigest())));
     printCommand(command);
@@ -235,16 +227,31 @@ public class RemoteClient {
     return action;
   }
 
-  // Output for print action command.
-  private void printAction(Digest actionDigest, int limit) throws IOException {
-    Action action = getAction(actionDigest);
-
+  private Command getCommand(Digest commandDigest) throws IOException {
     Command command;
     try {
-      command = Command.parseFrom(cache.downloadBlob(action.getCommandDigest()));
+      command = Command.parseFrom(cache.downloadBlob(commandDigest));
     } catch (IOException e) {
       throw new IOException("Could not obtain Command from digest.", e);
     }
+    return command;
+  }
+
+  private static com.google.devtools.remoteexecution.v1test.Action getActionV1FromFile(File file)
+      throws IOException {
+    com.google.devtools.remoteexecution.v1test.Action.Builder builder =
+        com.google.devtools.remoteexecution.v1test.Action.newBuilder();
+    try (FileInputStream fin = new FileInputStream(file)) {
+      TextFormat.getParser().merge(new InputStreamReader(fin), builder);
+    }
+    return builder.build();
+  }
+
+  // Output for print action command.
+  private void printAction(Digest actionDigest, int limit) throws IOException {
+    Action action = getAction(actionDigest);
+    Command command = getCommand(action.getCommandDigest());
+
     System.out.printf("Command [digest: %s]:\n", digestUtil.toString(action.getCommandDigest()));
     printCommand(command);
 
@@ -274,7 +281,7 @@ public class RemoteClient {
     if (file.hasDigest()) {
       contentString = "Content digest: " + digestUtil.toString(file.getDigest());
     } else {
-      contentString = "No digest included.";
+      contentString = "No digest included. This likely indicates a server error.";
     }
     System.out.printf(
         "%s [%s, executable: %b]\n", file.getPath(), contentString, file.getIsExecutable());
@@ -353,12 +360,7 @@ public class RemoteClient {
   // Given a docker run action, sets up a directory for an Action to be run in (download Action
   // inputs, set up output directories), and display a docker command that will run the Action.
   private void setupDocker(Action action, Path root) throws IOException {
-    Command command;
-    try {
-      command = Command.parseFrom(cache.downloadBlob(action.getCommandDigest()));
-    } catch (IOException e) {
-      throw new IOException("Failed to get Command for Action.", e);
-    }
+    Command command = getCommand(action.getCommandDigest());
     setupDocker(command, action.getInputRootDigest(), root);
   }
 
@@ -467,11 +469,7 @@ public class RemoteClient {
   }
 
   private static void doShowActionV1(File file, int limit, RemoteClient client) throws IOException {
-    com.google.devtools.remoteexecution.v1test.Action.Builder builder =
-        com.google.devtools.remoteexecution.v1test.Action.newBuilder();
-    FileInputStream fin = new FileInputStream(file);
-    TextFormat.getParser().merge(new InputStreamReader(fin), builder);
-    client.printActionV1(builder.build(), limit);
+    client.printActionV1(getActionV1FromFile(file), limit);
   }
 
   private static void doShowAction(ShowActionCommand options, RemoteClient client)
@@ -506,12 +504,7 @@ public class RemoteClient {
       System.exit(1);
     }
     if (options.file != null) {
-      com.google.devtools.remoteexecution.v1test.Action.Builder builder =
-          com.google.devtools.remoteexecution.v1test.Action.newBuilder();
-      try (FileInputStream fin = new FileInputStream(options.file)) {
-        TextFormat.getParser().merge(new InputStreamReader(fin), builder);
-      }
-      client.setupDocker(builder.build(), path);
+      client.setupDocker(getActionV1FromFile(options.file), path);
     } else if (options.actionDigest != null) {
       client.setupDocker(client.getAction(options.actionDigest), path);
     } else {
