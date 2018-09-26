@@ -468,10 +468,6 @@ public class RemoteClient {
     }
   }
 
-  private static void doShowActionV1(File file, int limit, RemoteClient client) throws IOException {
-    client.printActionV1(getActionV1FromFile(file), limit);
-  }
-
   private static void doShowAction(ShowActionCommand options, RemoteClient client)
       throws IOException {
     if (options.file != null && options.actionDigest != null) {
@@ -479,7 +475,7 @@ public class RemoteClient {
       System.exit(1);
     }
     if (options.file != null) {
-      doShowActionV1(options.file, options.limit, client);
+      client.printActionV1(getActionV1FromFile(options.file), options.limit);
     } else if (options.actionDigest != null) {
       client.printAction(options.actionDigest, options.limit);
     } else {
