@@ -1,25 +1,15 @@
 package com.google.devtools.build.remote.client;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 import com.google.common.collect.Multiset;
 import com.google.common.collect.TreeMultiset;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
-import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
-import java.io.BufferedWriter;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * A class to handle GRPc log grouped by actions
- */
+/** A class to handle GRPc log grouped by actions */
 final class ActionGrouping {
 
   // Key: actionId; Value: a set of associated log entries.

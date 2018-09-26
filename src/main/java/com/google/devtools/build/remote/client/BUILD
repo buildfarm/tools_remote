@@ -30,5 +30,7 @@ java_library(
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_watch_v1_java_proto",
+        "@remoteapis//:remote_execution_java_grpc",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )

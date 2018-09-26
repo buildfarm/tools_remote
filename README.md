@@ -64,43 +64,33 @@ human-readable way with the `printlog` command:
 
 ### Running Actions in Docker
 
+This is available to Remote API V2 functionality, which is present in Bazel 0.17
+and onward:
+
 Given an Action in protobuf text format that provides a `container-image` platform, this tool can
 set up its inputs in a local directory and print a Docker command that will run this individual
-action locally in that directory. Action protos in text format can be obtained by [printing a gRPC
-log](#readlog) for a Bazel run that executed that Action remotely and then copying the Action proto
-out of the printed log entry for the Execute call that executed that Action.
+action locally in that directory. The action digest can be obtained by [printing a gRPC
+log](#readlog) for a Bazel run that executed that Action remotely and viewing
+the relevant GetActionResult or Execute call.
 
 A given Action can be inspected with the `show_action` command:
 
-    $ cat ~/my_action
-    command_digest {
-      hash: "ecd108198bd58dd643b604c55f3d2b1079b1251e68fbed2632c2b8f8afcff7fa"
-      size_bytes: 2113
-    }
-    input_root_digest {
-      hash: "8ecae53041d1be4ca1c65c006f82ec825110741fbf620f5d2bd401d2893029de"
-      size_bytes: 165
-    }
-    output_files: "bazel-out/k8-fastbuild/testlogs/examples/cpp/hello-success_test/test.xml"
-    platform {
-      properties {
-        name: "container-image"
-        value: "gcr.io/cloud-marketplace/google/rbe-debian8@sha256:XXX"
-      }
-    }
 
     $ bazel-bin/remote_client \
         --remote_cache=localhost:8080 \
         show_action \
-        --textproto=~/my_action
-    Command [digest: ecd108198bd58dd643b604c55f3d2b1079b1251e68fbed2632c2b8f8afcff7fa/2113]:
-    external/bazel_tools/tools/test/test-setup.sh examples/cpp/hello-success_test
+        --digest ce5b3fe85286f6a2320ed343a6e651e923a89f9c97cd24e7cfbacd6b9e6ebcd2/147
 
-    Input files [total: 3, root Directory digest: 8ecae53041d1be4ca1c65c006f82ec825110741fbf620f5d2bd401d2893029de/165]:
-     ... (truncated)
+    Command [digest: 0f576d62c99503ec832bec4def17885cee5daffc5dd1ae70e3d955aecd58149a/4149]:
+    ... (truncated)
+    external/bazel_tools/tools/test/test-setup.sh examples/remotebuildexecution/rbe_system_check/cc/rbe_system_check_test
+
+    Input files [total: 3, root Directory digest: 9f03a53b777059ec5c85c946fbd6a7a7402e89a079e4ada935a829bf209751b2/165]:
+    ... (truncated)
 
     Output files:
-    bazel-out/k8-fastbuild/testlogs/examples/cpp/hello-success_test/test.xml
+    ... (truncated)
+    bazel-out/k8-fastbuild/testlogs/examples/remotebuildexecution/rbe_system_check/cc/rbe_system_check_test/test.xml
 
     Output directories:
     (none)
@@ -108,8 +98,9 @@ A given Action can be inspected with the `show_action` command:
     Platform:
     properties {
       name: "container-image"
-      value: "gcr.io/cloud-marketplace/google/rbe-debian8@sha256:XXX"
+      value: "docker://gcr.io/cloud-marketplace/google/rbe-ubuntu16-04@sha256:9bd8ba020af33edb5f11eff0af2f63b3bcb168cd6566d7b27c6685e717787928"
     }
+
 
 Note that this action has a `container-image` platform property which specifies a container that the
 action is to run in.
@@ -120,7 +111,7 @@ Docker command:
     $ bazel-bin/remote_client \
         --remote_cache=localhost:8080 \
         run \
-        --textproto=~/my_action \
+        --digest ce5b3fe85286f6a2320ed343a6e651e923a89f9c97cd24e7cfbacd6b9e6ebcd2/147 \
         --path=/tmp/run_here
      Setting up Action in directory /tmp/run_here...
 
@@ -128,8 +119,13 @@ Docker command:
 
      To run the Action locally, run:
        docker run -v /tmp/run_here:/tmp/run_here-docker -w /tmp/run_here-docker -e gcr.io/cloud-marketplace/google/rbe-debian8@sha256:XXX examples/cpp/hello-success_test
-    $ docker run -v /tmp/run_here:/tmp/run_here-docker -w /tmp/run_here-docker -e gcr.io/cloud-marketplace/google/rbe-debian8@sha256:XXX examples/cpp/hello-success_test
-    Hello world
+
+       docker run -u 277174 -v /tmp/run_here:/tmp/run_here-docker -w /tmp/run_here-docker (...)
+
+For V1 API and earlier, the action protos have not been stored in CAS.
+Instead of using action digest, the above commands can use the parameter
+--textproto to specify a path to a text proto file containing a V1 action.
+This can be copy-pasted from an Execute call in the grpc log.
 
 ## Developer Information
 

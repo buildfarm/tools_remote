@@ -25,45 +25,40 @@ import java.util.List;
 @Parameters(separators = "=")
 public final class AuthAndTLSOptions {
   @Parameter(
-    names = { "--google_default_credentials","--auth_enabled" },
-    arity = 1,
-    description =
-        "Whether to use 'Google Application Default Credentials' for authentication."
-            + " See https://cloud.google.com/docs/authentication for details. Disabled by default."
-  )
+      names = {"--google_default_credentials", "--auth_enabled"},
+      arity = 1,
+      description =
+          "Whether to use 'Google Application Default Credentials' for authentication."
+              + " See https://cloud.google.com/docs/authentication for details. Disabled by default.")
   public boolean useGoogleDefaultCredentials = false;
 
   @Parameter(
-    names = "--google_auth_scopes",
-    listConverter = CommaSeparatedOptionListConverter.class,
-    description = "A comma-separated list of Google Cloud authentication scopes."
-  )
+      names = "--google_auth_scopes",
+      listConverter = CommaSeparatedOptionListConverter.class,
+      description = "A comma-separated list of Google Cloud authentication scopes.")
   public List<String> googleAuthScopes =
       ImmutableList.of("https://www.googleapis.com/auth/cloud-platform");
 
   @Parameter(
-    names = "--google_credentials",
-    description =
-        "Specifies the file to get authentication credentials from. See "
-            + "https://cloud.google.com/docs/authentication for details"
-  )
+      names = "--google_credentials",
+      description =
+          "Specifies the file to get authentication credentials from. See "
+              + "https://cloud.google.com/docs/authentication for details")
   public String googleCredentials = null;
 
   @Parameter(names = "--tls_enabled", description = "Specifies whether to use TLS.")
   public boolean tlsEnabled = false;
 
   @Parameter(
-    names = "--tls_certificate",
-    description = "Specify the TLS client certificate to use."
-  )
+      names = "--tls_certificate",
+      description = "Specify the TLS client certificate to use.")
   public String tlsCertificate = null;
 
   @Parameter(
-    names = "--tls_authority_override",
-    description =
-        "TESTING ONLY! Can be used with a self-signed certificate to consider the specified "
-            + "value a valid TLS authority."
-  )
+      names = "--tls_authority_override",
+      description =
+          "TESTING ONLY! Can be used with a self-signed certificate to consider the specified "
+              + "value a valid TLS authority.")
   public String tlsAuthorityOverride = null;
 
   /** A converter for splitting comma-separated string inputs into lists of strings. */

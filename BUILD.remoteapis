@@ -1,0 +1,17 @@
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+exports_files(["LICENSE"])
+
+load("@//third_party/grpc_java:java_grpc_library.bzl", "java_grpc_library")
+
+java_grpc_library(
+    name = "remote_execution_java_grpc",
+    srcs = ["@remoteapis//build/bazel/remote/execution/v2:remote_execution_proto"],
+    deps = [
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
+        "@googleapis//:google_longrunning_operations_java_proto",
+    ],
+)
+

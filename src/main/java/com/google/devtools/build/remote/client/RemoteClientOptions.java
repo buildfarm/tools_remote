@@ -14,13 +14,13 @@
 
 package com.google.devtools.build.remote.client;
 
+import build.bazel.remote.execution.v2.Digest;
 import com.beust.jcommander.IStringConverter;
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.ParameterException;
 import com.beust.jcommander.Parameters;
 import com.beust.jcommander.converters.FileConverter;
 import com.beust.jcommander.converters.PathConverter;
-import com.google.devtools.remoteexecution.v1test.Digest;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -31,201 +31,177 @@ public final class RemoteClientOptions {
   @Parameter(names = "--help", description = "This message.", help = true)
   public boolean help;
 
-  @Parameter(
-      names = "--grpc_log",
-      description = "GRPC log to reference for additional information"
-  )
+  @Parameter(names = "--grpc_log", description = "GRPC log to reference for additional information")
   public String grpcLog = "";
 
   @Parameters(
-    commandDescription = "Recursively lists a Directory in remote cache.",
-    separators = "="
-  )
+      commandDescription = "Recursively lists a Directory in remote cache.",
+      separators = "=")
   public static class LsCommand {
     @Parameter(
-      names = {"--digest", "-d"},
-      required = true,
-      converter = DigestConverter.class,
-      description = "The digest of the Directory to list in hex_hash/size_bytes."
-    )
+        names = {"--digest", "-d"},
+        required = true,
+        converter = DigestConverter.class,
+        description = "The digest of the Directory to list in hex_hash/size_bytes.")
     public Digest digest = null;
 
     @Parameter(
-      names = {"--limit", "-l"},
-      description = "The maximum number of files in the Directory to list."
-    )
+        names = {"--limit", "-l"},
+        description = "The maximum number of files in the Directory to list.")
     public int limit = 100;
   }
 
   @Parameters(
-    commandDescription = "Recursively lists an OutputDirectory in remote cache.",
-    separators = "="
-  )
+      commandDescription = "Recursively lists an OutputDirectory in remote cache.",
+      separators = "=")
   public static class LsOutDirCommand {
     @Parameter(
-      names = {"--digest", "-d"},
-      required = true,
-      converter = DigestConverter.class,
-      description = "The digest of the OutputDirectory to list in hex_hash/size_bytes."
-    )
+        names = {"--digest", "-d"},
+        required = true,
+        converter = DigestConverter.class,
+        description = "The digest of the OutputDirectory to list in hex_hash/size_bytes.")
     public Digest digest = null;
 
     @Parameter(
-      names = {"--limit", "-l"},
-      description = "The maximum number of files in the OutputDirectory to list."
-    )
+        names = {"--limit", "-l"},
+        description = "The maximum number of files in the OutputDirectory to list.")
     public int limit = 100;
   }
 
   @Parameters(
-    commandDescription = "Recursively downloads a Directory from remote cache.",
-    separators = "="
-  )
+      commandDescription = "Recursively downloads a Directory from remote cache.",
+      separators = "=")
   public static class GetDirCommand {
     @Parameter(
-      names = {"--digest", "-d"},
-      required = true,
-      converter = DigestConverter.class,
-      description = "The digest of the Directory to download in hex_hash/size_bytes."
-    )
+        names = {"--digest", "-d"},
+        required = true,
+        converter = DigestConverter.class,
+        description = "The digest of the Directory to download in hex_hash/size_bytes.")
     public Digest digest = null;
 
     @Parameter(
-      names = {"--path", "-o"},
-      converter = PathConverter.class,
-      description = "The local path to download the Directory contents into."
-    )
+        names = {"--path", "-o"},
+        converter = PathConverter.class,
+        description = "The local path to download the Directory contents into.")
     public Path path = Paths.get("");
   }
 
   @Parameters(
-    commandDescription = "Recursively downloads a OutputDirectory from remote cache.",
-    separators = "="
-  )
+      commandDescription = "Recursively downloads a OutputDirectory from remote cache.",
+      separators = "=")
   public static class GetOutDirCommand {
     @Parameter(
-      names = {"--digest", "-d"},
-      required = true,
-      converter = DigestConverter.class,
-      description = "The digest of the OutputDirectory to download in hex_hash/size_bytes."
-    )
+        names = {"--digest", "-d"},
+        required = true,
+        converter = DigestConverter.class,
+        description = "The digest of the OutputDirectory to download in hex_hash/size_bytes.")
     public Digest digest = null;
 
     @Parameter(
-      names = {"--path", "-o"},
-      converter = PathConverter.class,
-      description = "The local path to download the OutputDirectory contents into."
-    )
+        names = {"--path", "-o"},
+        converter = PathConverter.class,
+        description = "The local path to download the OutputDirectory contents into.")
     public Path path = Paths.get("");
   }
 
   @Parameters(
-    commandDescription =
-        "Write contents of a blob from remote cache to stdout. If specified, "
-            + "the contents of the blob can be written to a specific file instead of stdout.",
-    separators = "="
-  )
+      commandDescription =
+          "Write contents of a blob from remote cache to stdout. If specified, "
+              + "the contents of the blob can be written to a specific file instead of stdout.",
+      separators = "=")
   public static class CatCommand {
     @Parameter(
-      names = {"--digest", "-d"},
-      required = true,
-      converter = DigestConverter.class,
-      description = "The digest in the format hex_hash/size_bytes of the blob to download."
-    )
+        names = {"--digest", "-d"},
+        required = true,
+        converter = DigestConverter.class,
+        description = "The digest in the format hex_hash/size_bytes of the blob to download.")
     public Digest digest = null;
 
     @Parameter(
-      names = {"--file", "-o"},
-      converter = FileConverter.class,
-      description = "Specifies a file to write the blob contents to instead of stdout."
-    )
+        names = {"--file", "-o"},
+        converter = FileConverter.class,
+        description = "Specifies a file to write the blob contents to instead of stdout.")
     public File file = null;
   }
 
   @Parameters(
-    commandDescription = "Parse and display an Action with its corresponding command.",
-    separators = "="
-  )
+      commandDescription = "Parse and display an Action with its corresponding command.",
+      separators = "=")
   public static class ShowActionCommand {
     @Parameter(
-      names = {"--textproto", "-p"},
-      required = true,
-      converter = FileConverter.class,
-      description = "Path to a Action proto stored in protobuf text format."
-    )
+        names = {"--textproto", "-p"},
+        converter = FileConverter.class,
+        description = "Path to a V1 Action proto stored in protobuf text format.")
     public File file = null;
 
     @Parameter(
-      names = {"--limit", "-l"},
-      description = "The maximum number of input/output files to list."
-    )
+        names = {"--digest", "-d"},
+        converter = DigestConverter.class,
+        description = "Action digest in the form hex_hash/size_bytes. Use for V2 API.")
+    public Digest actionDigest = null;
+
+    @Parameter(
+        names = {"--limit", "-l"},
+        description = "The maximum number of input/output files to list.")
     public int limit = 100;
   }
 
   @Parameters(commandDescription = "Parse and display an ActionResult.", separators = "=")
   public static class ShowActionResultCommand {
     @Parameter(
-      names = {"--textproto", "-p"},
-      required = true,
-      converter = FileConverter.class,
-      description = "Path to a ActionResult proto stored in protobuf text format."
-    )
+        names = {"--textproto", "-p"},
+        required = true,
+        converter = FileConverter.class,
+        description = "Path to a ActionResult proto stored in protobuf text format.")
     public File file = null;
 
     @Parameter(
-      names = {"--limit", "-l"},
-      description = "The maximum number of output files to list."
-    )
+        names = {"--limit", "-l"},
+        description = "The maximum number of output files to list.")
     public int limit = 100;
-
-    @Parameter(
-      names = {"--show_raw_output", "-r"},
-      description =
-          "Print OutputFile contents if they were returned as raw bytes in the given ActionResult."
-    )
-    public boolean showRawOutputs = false;
   }
 
   @Parameters(
-    commandDescription =
-        "Write all log entries from a Bazel gRPC log to standard output. The Bazel gRPC log "
-            + "consists of a sequence of delimited serialized LogEntry protobufs, as produced by "
-            + "the method LogEntry.writeDelimitedTo(OutputStream).",
-    separators = "="
-  )
+      commandDescription =
+          "Write all log entries from a Bazel gRPC log to standard output. The Bazel gRPC log "
+              + "consists of a sequence of delimited serialized LogEntry protobufs, as produced by "
+              + "the method LogEntry.writeDelimitedTo(OutputStream).",
+      separators = "=")
   public static class PrintLogCommand {
     @Parameter(
-      names = {"--group_by_action", "-g"},
-      description =
-          "Display entries grouped by action instead of individually. Entries are printed in order "
-              + "of their call started timestamps (earliest first). Entries without action-id"
-              + "metadata are skipped."
-    )
+        names = {"--group_by_action", "-g"},
+        description =
+            "Display entries grouped by action instead of individually. Entries are printed in order "
+                + "of their call started timestamps (earliest first). Entries without action-id"
+                + "metadata are skipped.")
     public boolean groupByAction;
   }
 
   @Parameters(
-    commandDescription =
-        "Sets up a directory and Docker command to locally run a single action"
-            + "given its Action proto. This requires the Action's inputs to be stored in CAS so that "
-            + "they can be retrieved.",
-    separators = "="
-  )
+      commandDescription =
+          "Sets up a directory and Docker command to locally run a single action"
+              + "given its Action proto. This requires the Action's inputs to be stored in CAS so that "
+              + "they can be retrieved.",
+      separators = "=")
   public static class RunCommand {
     @Parameter(
-      names = {"--textproto", "-p"},
-      required = true,
-      converter = FileConverter.class,
-      description =
-          "Path to the Action proto stored in protobuf text format to be run in the " + "container."
-    )
+        names = {"--textproto", "-p"},
+        converter = FileConverter.class,
+        description =
+            "Path to the Action proto stored in protobuf text format to be run in the "
+                + "container.")
     public File file = null;
 
     @Parameter(
-      names = {"--path", "-o"},
-      converter = PathConverter.class,
-      description = "Path to set up the action inputs in."
-    )
+        names = {"--digest", "-d"},
+        converter = DigestConverter.class,
+        description = "Action digest in the form hex_hash/size_bytes. Use for V2 API.")
+    public Digest actionDigest = null;
+
+    @Parameter(
+        names = {"--path", "-o"},
+        converter = PathConverter.class,
+        description = "Path to set up the action inputs in.")
     public Path path = null;
   }
 
