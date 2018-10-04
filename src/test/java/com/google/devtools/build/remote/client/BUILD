@@ -17,8 +17,8 @@ java_test(
         "//src/main/java/com/google/devtools/build/remote/client",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
+        "@remoteapis//:remote_execution_java_grpc",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
 
@@ -32,12 +32,24 @@ java_test(
 )
 
 java_test(
+    name = "ActionGroupingTest",
+    srcs = ["ActionGroupingTest.java"],
+    deps = [
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",
+        "//3rdparty/jvm/com/google/truth",
+        "//src/main/java/com/google/devtools/build/remote/client",
+        "//src/main/proto:remote_execution_log_java_proto",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
+    ],
+)
+
+java_test(
     name = "DockerUtilTest",
     srcs = ["DockerUtilTest.java"],
     deps = [
         "//3rdparty/jvm/com/google/truth",
         "//src/main/java/com/google/devtools/build/remote/client",
         "@com_google_guava_guava//jar",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )

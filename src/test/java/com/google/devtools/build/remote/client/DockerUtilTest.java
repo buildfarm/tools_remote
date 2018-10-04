@@ -15,7 +15,6 @@ package com.google.devtools.build.remote.client;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.Platform;
@@ -39,10 +38,6 @@ public class DockerUtilTest {
             .addArguments("escape<'>")
             .addEnvironmentVariables(
                 EnvironmentVariable.newBuilder().setName("PATH").setValue("/home/test"))
-            .build();
-    Action action =
-        Action.newBuilder()
-            .setCommandDigest(DIGEST_UTIL.compute(command.toByteArray()))
             .setPlatform(
                 Platform.newBuilder()
                     .addProperties(
@@ -50,11 +45,21 @@ public class DockerUtilTest {
                             .setName("container-image")
                             .setValue("docker://gcr.io/image")))
             .build();
-    String commandLine = DockerUtil.getDockerCommand(action, command, "/tmp/test");
-    assertThat(commandLine)
-        .isEqualTo(
-            "docker run -v /tmp/test:/tmp/test-docker -w /tmp/test-docker -e 'PATH=/home/test' "
-                + "gcr.io/image /bin/echo hello 'escape<'\\''>'");
+    String commandLine = DockerUtil.getDockerCommand(command, "/tmp/test");
+    long uid = DockerUtil.getUid();
+    if (uid < 0) {
+      assertThat(commandLine)
+          .isEqualTo(
+              "docker run -v /tmp/test:/tmp/test-docker -w /tmp/test-docker -e 'PATH=/home/test' "
+                  + "gcr.io/image /bin/echo hello 'escape<'\\''>'");
+    } else {
+      assertThat(commandLine)
+          .isEqualTo(
+              "docker run -u "
+                  + uid
+                  + " -v /tmp/test:/tmp/test-docker -w /tmp/test-docker -e 'PATH=/home/test' "
+                  + "gcr.io/image /bin/echo hello 'escape<'\\''>'");
+    }
   }
 
   @Test(expected = IllegalArgumentException.class)
@@ -67,8 +72,6 @@ public class DockerUtilTest {
             .addEnvironmentVariables(
                 EnvironmentVariable.newBuilder().setName("PATH").setValue("/home/test"))
             .build();
-    Action action =
-        Action.newBuilder().setCommandDigest(DIGEST_UTIL.compute(command.toByteArray())).build();
-    DockerUtil.getDockerCommand(action, command, "/tmp/test");
+    DockerUtil.getDockerCommand(command, "/tmp/test");
   }
 }
