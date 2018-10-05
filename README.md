@@ -62,10 +62,27 @@ human-readable way with the `printlog` command:
 
     $ bazel-bin/remote_client --grpc_log PATH_TO_LOG printlog
 
+## Getting a list of failed actions
+
+This is available to Remote API V2 functionality, which is present in Bazel 0.17
+and onward.
+
+The remote tool can analyse the grps log and print a list of digests of failed
+actions:
+
+    $ bazel-bin/remote_client --grpc_log PATH_TO_LOG failed_actions
+
+For the purpose of this command, a failed action is any action whose execute
+response returned a non-zero status. This does not include actions whose
+*execution* failed, for example, when remote execution was unavailable or
+returned internal errors.
+
+
 ### Running Actions in Docker
 
 This is available to Remote API V2 functionality, which is present in Bazel 0.17
-and onward:
+and onward.
+
 
 Given an Action in protobuf text format that provides a `container-image` platform, this tool can
 set up its inputs in a local directory and print a Docker command that will run this individual
@@ -126,6 +143,17 @@ For V1 API and earlier, the action protos have not been stored in CAS.
 Instead of using action digest, the above commands can use the parameter
 --textproto to specify a path to a text proto file containing a V1 action.
 This can be copy-pasted from an Execute call in the grpc log.
+
+For V2 API and later, you can skip specifying the action digest if `grpc_log` is
+specified. In this case, the tool will scan the log for failed actions. If a
+single failed action is found, it will use that action's digest. If multiple
+failed actions are found, it will print a list of options.
+
+    $ bazel-bin/remote_client \
+        --remote_cache=localhost:8080 \
+        --grpc_log=/tmp/grpclog
+        run
+
 
 ## Developer Information
 

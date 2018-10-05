@@ -16,6 +16,7 @@ package com.google.devtools.build.remote.client;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import build.bazel.remote.execution.v2.Digest;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.V1WatchDetails;
 import com.google.devtools.build.remote.client.RemoteClientOptions.PrintLogCommand;
@@ -61,14 +62,33 @@ public class LogParserUtils {
     return new FileInputStream(filename);
   }
 
+  // Returns an ExecutionResponse contained in the operation and null if none.
+  // If the operation contains an error, returns null and populates StringBuilder "error" with
+  // the error message.
+  public static <T extends Message> T getExecutionResponse(
+      Operation o, Class<T> t, StringBuilder error) throws IOException {
+    if (o.getResultCase() == ResultCase.ERROR && o.getError().getCode() != Code.OK.value()) {
+      error.append(o.getError().toString());
+      return null;
+    }
+    if (o.getResultCase() == ResultCase.RESPONSE && o.getDone()) {
+      return o.getResponse().unpack(t);
+    }
+    return null;
+  }
+
   private static <T extends Message> boolean maybePrintOperation(
       Operation o, PrintWriter out, Class<T> t) throws IOException {
-    if (o.getResultCase() == ResultCase.ERROR && o.getError().getCode() != Code.OK.value()) {
-      out.printf("Operation contained error: %s\n", o.getError().toString());
-      return true;
-    } else if (o.getResultCase() == ResultCase.RESPONSE && o.getDone()) {
+    StringBuilder error = new StringBuilder();
+    T result = getExecutionResponse(o, t, error);
+    if(result != null) {
       out.println("ExecuteResponse extracted:");
       out.println(o.getResponse().unpack(t).toString());
+      return true;
+    }
+    String errString = error.toString();
+    if(!errString.isEmpty()) {
+      out.printf("Operation contained error: %s\n", o.getError().toString());
       return true;
     }
     return false;
@@ -140,15 +160,20 @@ public class LogParserUtils {
     }
   }
 
-  private void printEntriesGroupedByAction(OutputStream outStream)
-      throws IOException, ParamException {
-    ActionGrouping byAction = new ActionGrouping();
+  private ActionGrouping initActionGrouping() throws IOException, ParamException{
+    ActionGrouping result = new ActionGrouping();
     try (InputStream in = openGrpcFileInputStream()) {
       LogEntry entry;
       while ((entry = LogEntry.parseDelimitedFrom(in)) != null) {
-        byAction.addLogEntry(entry);
+        result.addLogEntry(entry);
       }
     }
+    return result;
+  }
+
+  private void printEntriesGroupedByAction(OutputStream outStream)
+      throws IOException, ParamException {
+    ActionGrouping byAction = initActionGrouping();
     PrintWriter out =
         new PrintWriter(new BufferedWriter(new OutputStreamWriter(outStream, UTF_8)), true);
     byAction.printByAction(out);
@@ -165,6 +190,26 @@ public class LogParserUtils {
     } catch (ParamException e) {
       System.err.println(e.getMessage());
       System.exit(1);
+    }
+  }
+
+  /** Returns a list of actions failed in the grpc log */
+  public List<Digest> failedActions() throws IOException, ParamException {
+    ActionGrouping a = initActionGrouping();
+    return a.failedActions();
+  }
+
+  /** Print a list of actions  */
+  public void printFailedActions() throws IOException, ParamException {
+    PrintWriter out =
+        new PrintWriter(new BufferedWriter(new OutputStreamWriter(System.out, UTF_8)), true);
+    List<Digest> actions = failedActions();
+    if(actions.size() == 0) {
+      out.println("No failed actions found.");
+      return;
+    }
+    for(Digest d : actions) {
+      out.println("Failed action: " + d.getHash() + "/" + d.getSizeBytes());
     }
   }
 }
