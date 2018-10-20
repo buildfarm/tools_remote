@@ -1,5 +1,6 @@
 package com.google.devtools.build.remote.client;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.TreeMultiset;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
@@ -11,6 +12,14 @@ import java.util.Map;
 
 /** A class to handle GRPc log grouped by actions */
 final class ActionGrouping {
+
+  @VisibleForTesting
+  static final String actionDelimiter = "************************************************";
+
+  @VisibleForTesting
+  static final String entryDelimiter = "------------------------------------------------";
+
+  @VisibleForTesting static final String actionString = "Entries for action with hash '%s'\n";
 
   // Key: actionId; Value: a set of associated log entries.
   Map<String, Multiset<LogEntry>> actionMap = new HashMap<>();
@@ -25,19 +34,28 @@ final class ActionGrouping {
     if (!actionMap.containsKey(hash)) {
       actionMap.put(
           hash,
-          TreeMultiset.create((a, b) -> Timestamps.compare(a.getStartTime(), b.getStartTime())));
+          TreeMultiset.create(
+              (a, b) -> {
+                int i = Timestamps.compare(a.getStartTime(), b.getStartTime());
+                if (i != 0) {
+                  return i;
+                }
+                // In the improbable case of the same timestamp, ensure the messages do not
+                // override each other.
+                return a.hashCode() - b.hashCode();
+              }));
     }
     actionMap.get(hash).add(entry);
   }
 
   public void printByAction(PrintWriter out) throws IOException {
     for (String hash : actionMap.keySet()) {
-      out.println("************************************************");
-      out.printf("Entries for action with hash '%s'\n", hash);
-      out.println("************************************************");
+      out.println(actionDelimiter);
+      out.printf(actionString, hash);
+      out.println(actionDelimiter);
       for (LogEntry entry : actionMap.get(hash)) {
         LogParserUtils.printLogEntry(entry, out);
-        out.println("------------------------------------------------");
+        out.println(entryDelimiter);
       }
     }
     if (numSkipped > 0) {

@@ -57,7 +57,6 @@ import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
-import java.util.List;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -294,18 +293,12 @@ public class GrpcRemoteCacheTest {
     GetTreeResponse response2 = GetTreeResponse.newBuilder().addDirectories(barMessage).build();
     serviceRegistry.addService(
         new ContentAddressableStorageImplBase() {
-          List<GetTreeResponse> responses = ImmutableList.of(response1, response2);
-          int timesCalled = 0;
-
           @Override
           public void getTree(
               GetTreeRequest request, StreamObserver<GetTreeResponse> responseObserver) {
-            if (timesCalled == 1) {
-              assertThat(request.getPageToken()).matches("token");
-            }
-            responseObserver.onNext(responses.get(timesCalled));
+            responseObserver.onNext(response1);
+            responseObserver.onNext(response2);
             responseObserver.onCompleted();
-            timesCalled++;
           }
         });
     Tree tree = client.getTree(fooDigest);

@@ -16,6 +16,7 @@ package com.google.devtools.build.remote.client;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.Platform;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.ByteStreams;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,7 +32,8 @@ public final class DockerUtil {
    * Gets uid of the current user. If the uid could not be fetched, prints a message to stderr and
    * returns -1.
    */
-  private static long getUid() {
+  @VisibleForTesting
+  static long getUid() {
     ProcessBuilder processBuilder = new ProcessBuilder();
     processBuilder.command("id", "-u");
     try {
