@@ -29,9 +29,20 @@ import org.junit.runners.JUnit4;
 public class DockerUtilTest {
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(Hashing.sha256());
 
-  @Test
-  public void testGetDockerCommand() {
-    Command command =
+  private static class MockUidGetter extends DockerUtil.UidGetter {
+    long uid;
+
+    public MockUidGetter (long uid) {
+      this.uid = uid;
+    }
+
+    @Override
+    public long getUid() {
+      return uid;
+    }
+  }
+
+  static final Command command =
         Command.newBuilder()
             .addArguments("/bin/echo")
             .addArguments("hello")
@@ -45,21 +56,30 @@ public class DockerUtilTest {
                             .setName("container-image")
                             .setValue("docker://gcr.io/image")))
             .build();
+
+  @Test
+  public void testGetDockerCommandNoUid() {
+    DockerUtil.uidGetter = new MockUidGetter(-1);
     String commandLine = DockerUtil.getDockerCommand(command, "/tmp/test");
-    long uid = DockerUtil.getUid();
-    if (uid < 0) {
-      assertThat(commandLine)
+
+    assertThat(commandLine)
           .isEqualTo(
               "docker run -v /tmp/test:/tmp/test-docker -w /tmp/test-docker -e 'PATH=/home/test' "
                   + "gcr.io/image /bin/echo hello 'escape<'\\''>'");
-    } else {
+
+    DockerUtil.uidGetter = new MockUidGetter(-1);
+  }
+
+  @Test
+  public void testGetDockerCommandUid() {
+    DockerUtil.uidGetter = new MockUidGetter(14242);
+    String commandLine = DockerUtil.getDockerCommand(command, "/tmp/test");
+
       assertThat(commandLine)
           .isEqualTo(
-              "docker run -u "
-                  + uid
-                  + " -v /tmp/test:/tmp/test-docker -w /tmp/test-docker -e 'PATH=/home/test' "
+              "docker run -u 14242 -v /tmp/test:/tmp/test-docker "
+                  + "-w /tmp/test-docker -e 'PATH=/home/test' "
                   + "gcr.io/image /bin/echo hello 'escape<'\\''>'");
-    }
   }
 
   @Test(expected = IllegalArgumentException.class)

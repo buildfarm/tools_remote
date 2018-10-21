@@ -28,26 +28,32 @@ public final class DockerUtil {
   private static final String CONTAINER_IMAGE_ENTRY_NAME = "container-image";
   private static final String DOCKER_IMAGE_PREFIX = "docker://";
 
-  /**
-   * Gets uid of the current user. If the uid could not be fetched, prints a message to stderr and
-   * returns -1.
-   */
   @VisibleForTesting
-  static long getUid() {
-    ProcessBuilder processBuilder = new ProcessBuilder();
-    processBuilder.command("id", "-u");
-    try {
-      InputStream stdout = processBuilder.start().getInputStream();
-      byte[] output = ByteStreams.toByteArray(stdout);
-      return Long.parseLong(new String(output).trim());
-    } catch (IOException | NumberFormatException e) {
-      System.err.printf(
-          "Could not fetch UID for passing to Docker container. The provided docker "
-              + "command will not specify a uid (error: %s)\n",
-          e.toString());
-      return -1;
+  static class UidGetter {
+    /**
+     * Gets uid of the current user. If the uid could not be fetched, prints a message to stderr and
+     * returns -1.
+     */
+    @VisibleForTesting
+    long getUid() {
+      ProcessBuilder processBuilder = new ProcessBuilder();
+      processBuilder.command("id", "-u");
+      try {
+        InputStream stdout = processBuilder.start().getInputStream();
+        byte[] output = ByteStreams.toByteArray(stdout);
+        return Long.parseLong(new String(output).trim());
+      } catch (IOException | NumberFormatException e) {
+        System.err.printf(
+            "Could not fetch UID for passing to Docker container. The provided docker "
+                + "command will not specify a uid (error: %s)\n",
+            e.toString());
+        return -1;
+      }
     }
   }
+
+  @VisibleForTesting
+  static UidGetter uidGetter = new UidGetter();
 
   /**
    * Checks Action for Docker container definition.
@@ -96,7 +102,7 @@ public final class DockerUtil {
     commandElements.add("docker");
     commandElements.add("run");
 
-    long uid = getUid();
+    long uid = uidGetter.getUid();
     if (uid >= 0) {
       commandElements.add("-u");
       commandElements.add(Long.toString(uid));
