@@ -52,8 +52,16 @@ public final class DockerUtil {
     }
   }
 
+  private UidGetter uidGetter;
+
   @VisibleForTesting
-  static UidGetter uidGetter = new UidGetter();
+  DockerUtil(UidGetter getter) {
+    uidGetter = getter;
+  }
+
+  DockerUtil() {
+    this(new UidGetter());
+  }
 
   /**
    * Checks Action for Docker container definition.
@@ -93,7 +101,7 @@ public final class DockerUtil {
    * @param workingPath The path that is to be the working directory that the Action is to be
    *     executed in.
    */
-  public static String getDockerCommand(Command command, String workingPath) {
+  public String getDockerCommand(Command command, String workingPath) {
     String container = dockerContainer(command);
     if (container == null) {
       throw new IllegalArgumentException("No docker image specified in given Command.");

@@ -59,21 +59,19 @@ public class DockerUtilTest {
 
   @Test
   public void testGetDockerCommandNoUid() {
-    DockerUtil.uidGetter = new MockUidGetter(-1);
-    String commandLine = DockerUtil.getDockerCommand(command, "/tmp/test");
+    DockerUtil util = new DockerUtil(new MockUidGetter(-1));
+    String commandLine = util.getDockerCommand(command, "/tmp/test");
 
     assertThat(commandLine)
           .isEqualTo(
               "docker run -v /tmp/test:/tmp/test-docker -w /tmp/test-docker -e 'PATH=/home/test' "
                   + "gcr.io/image /bin/echo hello 'escape<'\\''>'");
-
-    DockerUtil.uidGetter = new MockUidGetter(-1);
   }
 
   @Test
   public void testGetDockerCommandUid() {
-    DockerUtil.uidGetter = new MockUidGetter(14242);
-    String commandLine = DockerUtil.getDockerCommand(command, "/tmp/test");
+    DockerUtil util = new DockerUtil(new MockUidGetter(14242));
+    String commandLine = util.getDockerCommand(command, "/tmp/test");
 
       assertThat(commandLine)
           .isEqualTo(
@@ -92,6 +90,7 @@ public class DockerUtilTest {
             .addEnvironmentVariables(
                 EnvironmentVariable.newBuilder().setName("PATH").setValue("/home/test"))
             .build();
-    DockerUtil.getDockerCommand(command, "/tmp/test");
+    DockerUtil util = new DockerUtil(new MockUidGetter(-1));
+    util.getDockerCommand(command, "/tmp/test");
   }
 }
