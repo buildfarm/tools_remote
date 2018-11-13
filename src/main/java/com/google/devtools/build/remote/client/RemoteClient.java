@@ -388,7 +388,8 @@ public class RemoteClient {
       }
       java.nio.file.Files.createDirectories(dir);
     }
-    String dockerCommand = DockerUtil.getDockerCommand(command, root.toString());
+    DockerUtil util = new DockerUtil();
+    String dockerCommand = util.getDockerCommand(command, root.toString());
     System.out.println("\nSuccessfully setup Action in directory " + root.toString() + ".");
     System.out.println("\nTo run the Action locally, run:");
     System.out.println("  " + dockerCommand);
