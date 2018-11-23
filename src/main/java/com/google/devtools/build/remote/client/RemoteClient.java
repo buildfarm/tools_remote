@@ -516,20 +516,20 @@ public class RemoteClient {
     } else if (!grpcLogFile.isEmpty()) {
       LogParserUtils parser = new LogParserUtils(grpcLogFile);
       List<Digest> actions = parser.failedActions();
-      if(actions.size() == 0) {
+      if (actions.size() == 0) {
         System.err.println("No action specified. No failed actions found in GRPC log.");
         System.exit(1);
-      } else if(actions.size() > 1) {
-        System.err.println("No action specified. Multiple failed actions found in GRPC log. Add one of the following options:");
-        for(Digest d : actions) {
+      } else if (actions.size() > 1) {
+        System.err.println(
+            "No action specified. Multiple failed actions found in GRPC log. Add one of the following options:");
+        for (Digest d : actions) {
           System.err.println(" --digest " + d.getHash() + "/" + d.getSizeBytes());
         }
         System.exit(1);
       }
       Digest action = actions.get(0);
       client.setupDocker(client.getAction(action), path);
-    }
-    else {
+    } else {
       System.err.println("Specify --file or --action_digest");
       System.exit(1);
     }
@@ -626,7 +626,10 @@ public class RemoteClient {
             showActionResultCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
         break;
       case "run":
-        doRun(remoteClientOptions.grpcLog, runCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
+        doRun(
+            remoteClientOptions.grpcLog,
+            runCommand,
+            makeClientWithOptions(remoteOptions, authAndTlsOptions));
         break;
       case "failed_actions":
         doFailedActions(remoteClientOptions.grpcLog, failedActionsCommand);

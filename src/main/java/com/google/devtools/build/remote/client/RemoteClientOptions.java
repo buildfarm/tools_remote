@@ -125,12 +125,9 @@ public final class RemoteClientOptions {
   }
 
   @Parameters(
-      commandDescription =
-          "Find and print action ids of failed actions from grpc log.",
+      commandDescription = "Find and print action ids of failed actions from grpc log.",
       separators = "=")
-  public static class FailedActionsCommand {
-  }
-
+  public static class FailedActionsCommand {}
 
   @Parameters(
       commandDescription = "Parse and display an Action with its corresponding command.",

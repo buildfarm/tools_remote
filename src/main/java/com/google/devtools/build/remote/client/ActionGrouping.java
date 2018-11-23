@@ -6,23 +6,18 @@ import build.bazel.remote.execution.v2.ExecuteResponse;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.TreeMultiset;
-import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.ExecuteDetails;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.RpcCallDetails;
 import com.google.longrunning.Operation;
-import com.google.longrunning.Operation.ResultCase;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
 import io.grpc.Status.Code;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
 
 /** A class to handle GRPc log grouped by actions */
 final class ActionGrouping {
@@ -61,29 +56,30 @@ final class ActionGrouping {
     }
 
     private void add(List<Operation> operations) throws IOException {
-      for(Operation o : operations) {
+      for (Operation o : operations) {
         StringBuilder error = new StringBuilder();
-        ExecuteResponse response = LogParserUtils.getExecutionResponse(o, ExecuteResponse.class, error);
-        if(response != null && response.hasResult()) {
+        ExecuteResponse response =
+            LogParserUtils.getExecutionResponse(o, ExecuteResponse.class, error);
+        if (response != null && response.hasResult()) {
           setResult(response.getResult());
         }
       }
     }
 
     void add(LogEntry entry) throws IOException {
-      if(!entry.hasDetails()) {
+      if (!entry.hasDetails()) {
         return;
       }
 
-      if(entry.getStatus().getCode() != Code.OK.value()) {
+      if (entry.getStatus().getCode() != Code.OK.value()) {
         return;
       }
 
       RpcCallDetails details = entry.getDetails();
 
-      if(details.hasExecute()) {
+      if (details.hasExecute()) {
         add(details.getExecute().getResponsesList());
-      } else if (details.hasWaitExecution()){
+      } else if (details.hasWaitExecution()) {
         add(details.getWaitExecution().getResponsesList());
       } else if (details.hasGetActionResult()) {
         setResult(details.getGetActionResult().getResponse());
@@ -91,37 +87,41 @@ final class ActionGrouping {
     }
   }
 
-  @VisibleForTesting static class ActionDetails {
+  @VisibleForTesting
+  static class ActionDetails {
     Multiset<LogEntry> log;
     Digest digest;
     ActionResultSummary summary;
 
     ActionDetails(String actionId) {
-      log = TreeMultiset.create(
-          (a, b) -> {
-            int i = Timestamps.compare(a.getStartTime(), b.getStartTime());
-            if (i != 0) {
-              return i;
-            }
-            // In the improbable case of the same timestamp, ensure the messages do not
-            // override each other.
-            return a.hashCode() - b.hashCode();
-          });
+      log =
+          TreeMultiset.create(
+              (a, b) -> {
+                int i = Timestamps.compare(a.getStartTime(), b.getStartTime());
+                if (i != 0) {
+                  return i;
+                }
+                // In the improbable case of the same timestamp, ensure the messages do not
+                // override each other.
+                return a.hashCode() - b.hashCode();
+              });
       summary = new ActionResultSummary(actionId);
     }
 
     private Digest extractDigest(LogEntry entry) {
-      if(!entry.hasDetails()) {
+      if (!entry.hasDetails()) {
         return null;
       }
       RpcCallDetails details = entry.getDetails();
-      if(details.hasExecute()) {
-        if(details.getExecute().hasRequest() && details.getExecute().getRequest().hasActionDigest()) {
+      if (details.hasExecute()) {
+        if (details.getExecute().hasRequest()
+            && details.getExecute().getRequest().hasActionDigest()) {
           return details.getExecute().getRequest().getActionDigest();
         }
       }
-      if(details.hasGetActionResult()) {
-        if(details.getGetActionResult().hasRequest() && details.getGetActionResult().getRequest().hasActionDigest()) {
+      if (details.hasGetActionResult()) {
+        if (details.getGetActionResult().hasRequest()
+            && details.getGetActionResult().getRequest().hasActionDigest()) {
           return details.getGetActionResult().getRequest().getActionDigest();
         }
       }
@@ -136,8 +136,8 @@ final class ActionGrouping {
       log.add(entry);
 
       Digest d = extractDigest(entry);
-      if(d != null) {
-        if(digest != null && !d.equals(digest)) {
+      if (d != null) {
+        if (digest != null && !d.equals(digest)) {
           System.err.println("Warning: conflicting digests: " + d + " and " + digest);
         }
         digest = d;
@@ -167,11 +167,14 @@ final class ActionGrouping {
   private int numSkipped = 0;
 
   private boolean isV1Entry(RpcCallDetails details) {
-    return details.hasV1Execute() || details.hasV1FindMissingBlobs() || details.hasV1GetActionResult() || details.hasV1Watch();
+    return details.hasV1Execute()
+        || details.hasV1FindMissingBlobs()
+        || details.hasV1GetActionResult()
+        || details.hasV1Watch();
   }
 
   void addLogEntry(LogEntry entry) throws IOException {
-    if(entry.hasDetails() && isV1Entry(entry.getDetails())) {
+    if (entry.hasDetails() && isV1Entry(entry.getDetails())) {
       V1found = true;
     }
 
@@ -204,7 +207,7 @@ final class ActionGrouping {
   }
 
   List<Digest> failedActions() throws IOException {
-    if(V1found) {
+    if (V1found) {
       System.err.println(
           "This functinality is not supported for V1 API. Please upgrade your Bazel version.");
       System.exit(1);

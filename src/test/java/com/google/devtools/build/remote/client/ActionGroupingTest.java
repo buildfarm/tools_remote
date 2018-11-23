@@ -18,7 +18,6 @@ import static com.google.common.truth.Truth.assertWithMessage;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.ExecuteRequest;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.bazel.remote.execution.v2.RequestMetadata;
@@ -28,7 +27,6 @@ import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.RpcCallDetails;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.WaitExecutionDetails;
 import com.google.devtools.build.remote.client.ActionGrouping.ActionDetails;
-import com.google.devtools.build.remote.client.ActionGrouping.ActionResultSummary;
 import com.google.devtools.build.remote.client.LogParserUtils.ParamException;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
@@ -127,7 +125,7 @@ public class ActionGroupingTest {
             .setMetadata(m)
             .setMethodName(method)
             .setStartTime(Timestamps.fromNanos(nanos));
-    if(details != null) {
+    if (details != null) {
       result.setDetails(details);
     }
     return result.build();
@@ -216,7 +214,7 @@ public class ActionGroupingTest {
 
   Digest toDigest(String d) {
     String[] parts = d.split("/");
-    assert(parts.length == 2);
+    assert (parts.length == 2);
     long size = Long.parseLong(parts[1]);
     return Digest.newBuilder().setHash(parts[0]).setSizeBytes(size).build();
   }
@@ -224,46 +222,62 @@ public class ActionGroupingTest {
   private LogEntry makeFailedGetActionResult(int nanos, String digest) {
     RpcCallDetails.Builder details = RpcCallDetails.newBuilder();
     details.getGetActionResultBuilder().getRequestBuilder().setActionDigest(toDigest(digest));
-    LogEntry logEntry = getLogEntry(toDigest(digest).getHash(), "getActionResult", nanos, details.build());
+    LogEntry logEntry =
+        getLogEntry(toDigest(digest).getHash(), "getActionResult", nanos, details.build());
     LogEntry.Builder result = LogEntry.newBuilder(logEntry);
     result.getStatusBuilder().setCode(Status.NOT_FOUND.getCode().value());
     return result.build();
   }
 
   private RpcCallDetails makeGetActionResult(ActionResult result) {
-    GetActionResultDetails getActionResult = GetActionResultDetails.newBuilder().setResponse(result).build();
+    GetActionResultDetails getActionResult =
+        GetActionResultDetails.newBuilder().setResponse(result).build();
     return RpcCallDetails.newBuilder().setGetActionResult(getActionResult).build();
   }
 
   private RpcCallDetails makeGetActionResultWithDigest(ActionResult result, String digest) {
-    GetActionResultRequest request = GetActionResultRequest.newBuilder().setActionDigest(toDigest(digest)).build();
-    GetActionResultDetails getActionResult = GetActionResultDetails.newBuilder().setResponse(result).build();
+    GetActionResultRequest request =
+        GetActionResultRequest.newBuilder().setActionDigest(toDigest(digest)).build();
+    GetActionResultDetails getActionResult =
+        GetActionResultDetails.newBuilder().setResponse(result).build();
     return RpcCallDetails.newBuilder().setGetActionResult(getActionResult).build();
   }
 
   private RpcCallDetails makeExecute(ActionResult result) {
     ExecuteResponse response = ExecuteResponse.newBuilder().setResult(result).build();
-    Operation operation = Operation.newBuilder().setResponse(Any.pack(response)).setDone(true).build();
+    Operation operation =
+        Operation.newBuilder().setResponse(Any.pack(response)).setDone(true).build();
     ExecuteDetails execute = ExecuteDetails.newBuilder().addResponses(operation).build();
     return RpcCallDetails.newBuilder().setExecute(execute).build();
   }
 
   private RpcCallDetails makeWatch(ActionResult result) {
     ExecuteResponse response = ExecuteResponse.newBuilder().setResult(result).build();
-    Operation operation = Operation.newBuilder().setResponse(Any.pack(response)).setDone(true).build();
-    WaitExecutionDetails waitExecution = WaitExecutionDetails.newBuilder().addResponses(operation).build();
+    Operation operation =
+        Operation.newBuilder().setResponse(Any.pack(response)).setDone(true).build();
+    WaitExecutionDetails waitExecution =
+        WaitExecutionDetails.newBuilder().addResponses(operation).build();
     return RpcCallDetails.newBuilder().setWaitExecution(waitExecution).build();
   }
 
   private LogEntry addDigest(LogEntry entry, String digest) {
     LogEntry.Builder result = LogEntry.newBuilder(entry);
-    assert(entry.hasDetails());
-    if(entry.getDetails().hasExecute()) {
-      result.getDetailsBuilder().getExecuteBuilder().getRequestBuilder().setActionDigest(toDigest(digest));
-    } else if(entry.getDetails().hasGetActionResult()) {
-      result.getDetailsBuilder().getGetActionResultBuilder().getRequestBuilder().setActionDigest(toDigest(digest));
+    assert (entry.hasDetails());
+    if (entry.getDetails().hasExecute()) {
+      result
+          .getDetailsBuilder()
+          .getExecuteBuilder()
+          .getRequestBuilder()
+          .setActionDigest(toDigest(digest));
+    } else if (entry.getDetails().hasGetActionResult()) {
+      result
+          .getDetailsBuilder()
+          .getGetActionResultBuilder()
+          .getRequestBuilder()
+          .setActionDigest(toDigest(digest));
     } else {
-      assertWithMessage("Can't add digest to an entry that is neither Execute nor GetActionResult").fail();
+      assertWithMessage("Can't add digest to an entry that is neither Execute nor GetActionResult")
+          .fail();
     }
     return result.build();
   }
@@ -273,8 +287,8 @@ public class ActionGroupingTest {
   public void ActionResultForEmpty() {
     ActionDetails details = new ActionDetails("actionId");
     // Action with no log entries is not failed but has no actionResult
-    assert(details.summary.getActionResult() == null);
-    assert(!details.isFailed());
+    assert (details.summary.getActionResult() == null);
+    assert (!details.isFailed());
   };
 
   @Test
@@ -282,8 +296,8 @@ public class ActionGroupingTest {
     ActionDetails details = new ActionDetails("actionId");
     // Action with no log entries is not failed but has no actionResult
     details.add(getLogEntry("actionId", "Execute", 10, makeGetActionResult(actionResultSuccess)));
-    assert(details.summary.getActionResult() != null);
-    assert(!details.isFailed());
+    assert (details.summary.getActionResult() != null);
+    assert (!details.isFailed());
   };
 
   @Test
@@ -291,18 +305,17 @@ public class ActionGroupingTest {
     ActionDetails details = new ActionDetails("actionId");
     // Action with no log entries is not failed but has no actionResult
     details.add(getLogEntry("actionId", "Execute", 10, makeGetActionResult(actionResultFail)));
-    assert(details.summary.getActionResult() != null);
-    assert(details.isFailed());
+    assert (details.summary.getActionResult() != null);
+    assert (details.isFailed());
   };
-
 
   @Test
   public void ActionResultFromExecutePass() throws IOException {
     ActionDetails details = new ActionDetails("actionId");
     // Action with no log entries is not failed but has no actionResult
     details.add(getLogEntry("actionId", "Execute", 10, makeExecute(actionResultSuccess)));
-    assert(details.summary.getActionResult() != null);
-    assert(!details.isFailed());
+    assert (details.summary.getActionResult() != null);
+    assert (!details.isFailed());
   };
 
   @Test
@@ -310,8 +323,8 @@ public class ActionGroupingTest {
     ActionDetails details = new ActionDetails("actionId");
     // Action with no log entries is not failed but has no actionResult
     details.add(getLogEntry("actionId", "Execute", 10, makeExecute(actionResultFail)));
-    assert(details.summary.getActionResult() != null);
-    assert(details.isFailed());
+    assert (details.summary.getActionResult() != null);
+    assert (details.isFailed());
   };
 
   @Test
@@ -319,8 +332,8 @@ public class ActionGroupingTest {
     ActionDetails details = new ActionDetails("actionId");
     // Action with no log entries is not failed but has no actionResult
     details.add(getLogEntry("actionId", "Execute", 10, makeWatch(actionResultSuccess)));
-    assert(details.summary.getActionResult() != null);
-    assert(!details.isFailed());
+    assert (details.summary.getActionResult() != null);
+    assert (!details.isFailed());
   };
 
   @Test
@@ -328,15 +341,15 @@ public class ActionGroupingTest {
     ActionDetails details = new ActionDetails("actionId");
     // Action with no log entries is not failed but has no actionResult
     details.add(getLogEntry("actionId", "Execute", 10, makeWatch(actionResultFail)));
-    assert(details.summary.getActionResult() != null);
-    assert(details.isFailed());
+    assert (details.summary.getActionResult() != null);
+    assert (details.isFailed());
   };
 
   @Test
   public void FailedActionsEmpty() throws IOException, ParamException {
     ActionGrouping grouping = new ActionGrouping();
     List<Digest> result = grouping.failedActions();
-    assert(result.isEmpty());
+    assert (result.isEmpty());
   }
 
   @Test
@@ -344,21 +357,19 @@ public class ActionGroupingTest {
     ActionGrouping grouping = new ActionGrouping();
     grouping.addLogEntry(getLogEntry("actionId", "Execute", 10, makeWatch(actionResultSuccess)));
     List<Digest> result = grouping.failedActions();
-    assert(result.isEmpty());
+    assert (result.isEmpty());
   }
 
   @Test
   public void FailedActionsOneFail() throws IOException, ParamException {
     ActionGrouping grouping = new ActionGrouping();
-    grouping.addLogEntry(addDigest(
-        getLogEntry("12345", "Execute", 10, makeExecute(actionResultSuccess)),
-        "12345/56"));
-    grouping.addLogEntry(addDigest(
-        getLogEntry("987", "Execute", 10, makeExecute(actionResultFail)),
-        "987/22"));
-    grouping.addLogEntry(addDigest(
-        getLogEntry("345", "Execute", 10, makeExecute(actionResultSuccess)),
-        "345/1"));
+    grouping.addLogEntry(
+        addDigest(
+            getLogEntry("12345", "Execute", 10, makeExecute(actionResultSuccess)), "12345/56"));
+    grouping.addLogEntry(
+        addDigest(getLogEntry("987", "Execute", 10, makeExecute(actionResultFail)), "987/22"));
+    grouping.addLogEntry(
+        addDigest(getLogEntry("345", "Execute", 10, makeExecute(actionResultSuccess)), "345/1"));
     List<Digest> result = grouping.failedActions();
 
     List<Digest> expected = Arrays.asList(toDigest("987/22"));
@@ -368,33 +379,31 @@ public class ActionGroupingTest {
   @Test
   public void FailedActionsManyFail() throws IOException, ParamException {
     ActionGrouping grouping = new ActionGrouping();
-    grouping.addLogEntry(addDigest(
-        getLogEntry("12345", "Execute", 10, makeExecute(actionResultFail)),
-        "12345/56"));
-    grouping.addLogEntry(addDigest(
-        getLogEntry("987", "Execute", 10, makeExecute(actionResultFail)),
-        "987/22"));
-    grouping.addLogEntry(addDigest(
-        getLogEntry("345", "Execute", 10, makeExecute(actionResultFail)),
-        "345/1"));
+    grouping.addLogEntry(
+        addDigest(getLogEntry("12345", "Execute", 10, makeExecute(actionResultFail)), "12345/56"));
+    grouping.addLogEntry(
+        addDigest(getLogEntry("987", "Execute", 10, makeExecute(actionResultFail)), "987/22"));
+    grouping.addLogEntry(
+        addDigest(getLogEntry("345", "Execute", 10, makeExecute(actionResultFail)), "345/1"));
     List<Digest> result = grouping.failedActions();
 
-    List<Digest> expected = Arrays.asList(toDigest("12345/56"), toDigest("987/22"), toDigest("345/1"));
+    List<Digest> expected =
+        Arrays.asList(toDigest("12345/56"), toDigest("987/22"), toDigest("345/1"));
     assertThat(result).isEqualTo(expected);
   }
 
   @Test
   public void FailedActionsDifferentResults() throws IOException, ParamException {
     ActionGrouping grouping = new ActionGrouping();
-    grouping.addLogEntry(addDigest(
-        getLogEntry("12345", "Execute", 10, makeGetActionResult(actionResultFail)),
-        "12345/56"));
-    grouping.addLogEntry(addDigest(
-        getLogEntry("987", "Execute", 10, makeGetActionResult(actionResultSuccess)),
-        "987/22"));
-    grouping.addLogEntry(addDigest(
-        getLogEntry("345", "Execute", 10, makeExecute(actionResultFail)),
-        "345/1"));
+    grouping.addLogEntry(
+        addDigest(
+            getLogEntry("12345", "Execute", 10, makeGetActionResult(actionResultFail)),
+            "12345/56"));
+    grouping.addLogEntry(
+        addDigest(
+            getLogEntry("987", "Execute", 10, makeGetActionResult(actionResultSuccess)), "987/22"));
+    grouping.addLogEntry(
+        addDigest(getLogEntry("345", "Execute", 10, makeExecute(actionResultFail)), "345/1"));
     List<Digest> result = grouping.failedActions();
 
     List<Digest> expected = Arrays.asList(toDigest("12345/56"), toDigest("345/1"));
@@ -415,9 +424,10 @@ public class ActionGroupingTest {
   @Test
   public void FailedActionsGetsDigestFromExecute() throws IOException, ParamException {
     ActionGrouping grouping = new ActionGrouping();
-    grouping.addLogEntry(addDigest(
-        getLogEntry("12345", "Execute", 10, makeExecute(ActionResult.getDefaultInstance())),
-        "12345/1"));
+    grouping.addLogEntry(
+        addDigest(
+            getLogEntry("12345", "Execute", 10, makeExecute(ActionResult.getDefaultInstance())),
+            "12345/1"));
     grouping.addLogEntry(getLogEntry("12345", "Execute", 10, makeWatch(actionResultFail)));
     List<Digest> result = grouping.failedActions();
 
@@ -428,9 +438,11 @@ public class ActionGroupingTest {
   @Test
   public void FailedActionsDoesntGetDigestFromWrongExecute() throws IOException, ParamException {
     ActionGrouping grouping = new ActionGrouping();
-    grouping.addLogEntry(addDigest(
-        getLogEntry("wrong_action", "Execute", 10, makeExecute(ActionResult.getDefaultInstance())),
-        "12345/1"));
+    grouping.addLogEntry(
+        addDigest(
+            getLogEntry(
+                "wrong_action", "Execute", 10, makeExecute(ActionResult.getDefaultInstance())),
+            "12345/1"));
     grouping.addLogEntry(getLogEntry("12345", "Execute", 10, makeWatch(actionResultFail)));
     List<Digest> result = grouping.failedActions();
 

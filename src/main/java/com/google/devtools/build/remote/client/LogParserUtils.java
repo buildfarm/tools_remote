@@ -81,13 +81,13 @@ public class LogParserUtils {
       Operation o, PrintWriter out, Class<T> t) throws IOException {
     StringBuilder error = new StringBuilder();
     T result = getExecutionResponse(o, t, error);
-    if(result != null) {
+    if (result != null) {
       out.println("ExecuteResponse extracted:");
       out.println(o.getResponse().unpack(t).toString());
       return true;
     }
     String errString = error.toString();
-    if(!errString.isEmpty()) {
+    if (!errString.isEmpty()) {
       out.printf("Operation contained error: %s\n", o.getError().toString());
       return true;
     }
@@ -160,7 +160,7 @@ public class LogParserUtils {
     }
   }
 
-  private ActionGrouping initActionGrouping() throws IOException, ParamException{
+  private ActionGrouping initActionGrouping() throws IOException, ParamException {
     ActionGrouping result = new ActionGrouping();
     try (InputStream in = openGrpcFileInputStream()) {
       LogEntry entry;
@@ -199,16 +199,16 @@ public class LogParserUtils {
     return a.failedActions();
   }
 
-  /** Print a list of actions  */
+  /** Print a list of actions */
   public void printFailedActions() throws IOException, ParamException {
     PrintWriter out =
         new PrintWriter(new BufferedWriter(new OutputStreamWriter(System.out, UTF_8)), true);
     List<Digest> actions = failedActions();
-    if(actions.size() == 0) {
+    if (actions.size() == 0) {
       out.println("No failed actions found.");
       return;
     }
-    for(Digest d : actions) {
+    for (Digest d : actions) {
       out.println("Failed action: " + d.getHash() + "/" + d.getSizeBytes());
     }
   }
