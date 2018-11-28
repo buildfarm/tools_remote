@@ -114,8 +114,8 @@ public class ActionGroupingTest {
 
   @Test
   public void EmptyGrouping() throws Exception {
-    ActionGrouping actionGrouping = new ActionGrouping();
-    checkOutput(actionGrouping); // This will ensure there are no delimiters in the output
+    ActionGrouping.Builder actionGrouping = new ActionGrouping.Builder();
+    checkOutput(actionGrouping.build()); // This will ensure there are no delimiters in the output
   }
 
   private LogEntry getLogEntry(String actionId, String method, int nanos, RpcCallDetails details) {
@@ -141,10 +141,10 @@ public class ActionGroupingTest {
 
   @Test
   public void SingleLog() throws Exception {
-    ActionGrouping actionGrouping = new ActionGrouping();
+    ActionGrouping.Builder actionGrouping = new ActionGrouping.Builder();
     actionGrouping.addLogEntry(getLogEntry("action1", "call1", 4));
     checkOutput(
-        actionGrouping,
+        actionGrouping.build(),
         ActionGrouping.actionDelimiter,
         actionHeader("action1"),
         ActionGrouping.actionDelimiter,
@@ -155,13 +155,13 @@ public class ActionGroupingTest {
   @Test
   public void SameTimestamp() throws Exception {
     // Events with the same timestamp must all be present, but their ordering is arbitrary.
-    ActionGrouping actionGrouping = new ActionGrouping();
+    ActionGrouping.Builder actionGrouping = new ActionGrouping.Builder();
     actionGrouping.addLogEntry(getLogEntry("action1", "a1_call1", 5));
     actionGrouping.addLogEntry(getLogEntry("action2", "a2_call1", 5));
     actionGrouping.addLogEntry(getLogEntry("action1", "a1_call2", 5));
     actionGrouping.addLogEntry(getLogEntry("action1", "a1_call3", 5));
 
-    String result = getOutput(actionGrouping);
+    String result = getOutput(actionGrouping.build());
 
     assertWithMessage("Output: \n" + result).that(result).contains("a1_call1");
     assertWithMessage("Output: \n" + result).that(result).contains("a1_call2");
@@ -171,7 +171,7 @@ public class ActionGroupingTest {
 
   @Test
   public void Sorting() throws Exception {
-    ActionGrouping actionGrouping = new ActionGrouping();
+    ActionGrouping.Builder actionGrouping = new ActionGrouping.Builder();
     actionGrouping.addLogEntry(getLogEntry("action1", "a1_call_5", 5));
     actionGrouping.addLogEntry(getLogEntry("action2", "a2_call_10", 10));
     actionGrouping.addLogEntry(getLogEntry("action1", "a1_call_3", 3));
@@ -181,7 +181,7 @@ public class ActionGroupingTest {
     actionGrouping.addLogEntry(getLogEntry("action2", "a2_call_50", 50));
     actionGrouping.addLogEntry(getLogEntry("action3", "a3_call_1", 1));
     checkOutput(
-        actionGrouping,
+        actionGrouping.build(),
         ActionGrouping.actionDelimiter,
         actionHeader("action1"),
         ActionGrouping.actionDelimiter,
@@ -285,84 +285,93 @@ public class ActionGroupingTest {
   // Test logic to extract action result
   @Test
   public void ActionResultForEmpty() {
-    ActionDetails details = new ActionDetails("actionId");
+    ActionDetails.Builder detailsBuilder = new ActionDetails.Builder("actionId");
+    ActionDetails details = detailsBuilder.build();
     // Action with no log entries is not failed but has no actionResult
-    assert (details.summary.getActionResult() == null);
+    assert (details.getActionResult() == null);
     assert (!details.isFailed());
   };
 
   @Test
   public void ActionResultFromCachePass() throws IOException {
-    ActionDetails details = new ActionDetails("actionId");
+    ActionDetails.Builder detailsBuilder = new ActionDetails.Builder("actionId");
     // Action with no log entries is not failed but has no actionResult
-    details.add(getLogEntry("actionId", "Execute", 10, makeGetActionResult(actionResultSuccess)));
-    assert (details.summary.getActionResult() != null);
+    detailsBuilder.add(
+        getLogEntry("actionId", "Execute", 10, makeGetActionResult(actionResultSuccess)));
+    ActionDetails details = detailsBuilder.build();
+    assert (details.getActionResult() != null);
     assert (!details.isFailed());
   };
 
   @Test
   public void ActionResultFromCacheFail() throws IOException {
-    ActionDetails details = new ActionDetails("actionId");
+    ActionDetails.Builder detailsBuilder = new ActionDetails.Builder("actionId");
     // Action with no log entries is not failed but has no actionResult
-    details.add(getLogEntry("actionId", "Execute", 10, makeGetActionResult(actionResultFail)));
-    assert (details.summary.getActionResult() != null);
+    detailsBuilder.add(
+        getLogEntry("actionId", "Execute", 10, makeGetActionResult(actionResultFail)));
+    ActionDetails details = detailsBuilder.build();
+    assert (details.getActionResult() != null);
     assert (details.isFailed());
   };
 
   @Test
   public void ActionResultFromExecutePass() throws IOException {
-    ActionDetails details = new ActionDetails("actionId");
+    ActionDetails.Builder detailsBuilder = new ActionDetails.Builder("actionId");
     // Action with no log entries is not failed but has no actionResult
-    details.add(getLogEntry("actionId", "Execute", 10, makeExecute(actionResultSuccess)));
-    assert (details.summary.getActionResult() != null);
+    detailsBuilder.add(getLogEntry("actionId", "Execute", 10, makeExecute(actionResultSuccess)));
+    ActionDetails details = detailsBuilder.build();
+    assert (details.getActionResult() != null);
     assert (!details.isFailed());
   };
 
   @Test
   public void ActionResultFromExecuteFail() throws IOException {
-    ActionDetails details = new ActionDetails("actionId");
+    ActionDetails.Builder detailsBuilder = new ActionDetails.Builder("actionId");
     // Action with no log entries is not failed but has no actionResult
-    details.add(getLogEntry("actionId", "Execute", 10, makeExecute(actionResultFail)));
-    assert (details.summary.getActionResult() != null);
+    detailsBuilder.add(getLogEntry("actionId", "Execute", 10, makeExecute(actionResultFail)));
+    ActionDetails details = detailsBuilder.build();
+    assert (details.getActionResult() != null);
     assert (details.isFailed());
   };
 
   @Test
   public void ActionResultFromWatchPass() throws IOException {
-    ActionDetails details = new ActionDetails("actionId");
+    ActionDetails.Builder detailsBuilder = new ActionDetails.Builder("actionId");
     // Action with no log entries is not failed but has no actionResult
-    details.add(getLogEntry("actionId", "Execute", 10, makeWatch(actionResultSuccess)));
-    assert (details.summary.getActionResult() != null);
+    detailsBuilder.add(getLogEntry("actionId", "Execute", 10, makeWatch(actionResultSuccess)));
+    ActionDetails details = detailsBuilder.build();
+    assert (details.getActionResult() != null);
     assert (!details.isFailed());
   };
 
   @Test
   public void ActionResultFromWatchFail() throws IOException {
-    ActionDetails details = new ActionDetails("actionId");
+    ActionDetails.Builder detailsBuilder = new ActionDetails.Builder("actionId");
     // Action with no log entries is not failed but has no actionResult
-    details.add(getLogEntry("actionId", "Execute", 10, makeWatch(actionResultFail)));
-    assert (details.summary.getActionResult() != null);
+    detailsBuilder.add(getLogEntry("actionId", "Execute", 10, makeWatch(actionResultFail)));
+    ActionDetails details = detailsBuilder.build();
+    assert (details.getActionResult() != null);
     assert (details.isFailed());
   };
 
   @Test
   public void FailedActionsEmpty() throws IOException, ParamException {
-    ActionGrouping grouping = new ActionGrouping();
-    List<Digest> result = grouping.failedActions();
+    ActionGrouping.Builder grouping = new ActionGrouping.Builder();
+    List<Digest> result = grouping.build().failedActions();
     assert (result.isEmpty());
   }
 
   @Test
   public void FailedActionsAllPass() throws IOException, ParamException {
-    ActionGrouping grouping = new ActionGrouping();
+    ActionGrouping.Builder grouping = new ActionGrouping.Builder();
     grouping.addLogEntry(getLogEntry("actionId", "Execute", 10, makeWatch(actionResultSuccess)));
-    List<Digest> result = grouping.failedActions();
+    List<Digest> result = grouping.build().failedActions();
     assert (result.isEmpty());
   }
 
   @Test
   public void FailedActionsOneFail() throws IOException, ParamException {
-    ActionGrouping grouping = new ActionGrouping();
+    ActionGrouping.Builder grouping = new ActionGrouping.Builder();
     grouping.addLogEntry(
         addDigest(
             getLogEntry("12345", "Execute", 10, makeExecute(actionResultSuccess)), "12345/56"));
@@ -370,7 +379,7 @@ public class ActionGroupingTest {
         addDigest(getLogEntry("987", "Execute", 10, makeExecute(actionResultFail)), "987/22"));
     grouping.addLogEntry(
         addDigest(getLogEntry("345", "Execute", 10, makeExecute(actionResultSuccess)), "345/1"));
-    List<Digest> result = grouping.failedActions();
+    List<Digest> result = grouping.build().failedActions();
 
     List<Digest> expected = Arrays.asList(toDigest("987/22"));
     assertThat(result).isEqualTo(expected);
@@ -378,14 +387,14 @@ public class ActionGroupingTest {
 
   @Test
   public void FailedActionsManyFail() throws IOException, ParamException {
-    ActionGrouping grouping = new ActionGrouping();
+    ActionGrouping.Builder grouping = new ActionGrouping.Builder();
     grouping.addLogEntry(
         addDigest(getLogEntry("12345", "Execute", 10, makeExecute(actionResultFail)), "12345/56"));
     grouping.addLogEntry(
         addDigest(getLogEntry("987", "Execute", 10, makeExecute(actionResultFail)), "987/22"));
     grouping.addLogEntry(
         addDigest(getLogEntry("345", "Execute", 10, makeExecute(actionResultFail)), "345/1"));
-    List<Digest> result = grouping.failedActions();
+    List<Digest> result = grouping.build().failedActions();
 
     List<Digest> expected =
         Arrays.asList(toDigest("12345/56"), toDigest("987/22"), toDigest("345/1"));
@@ -394,7 +403,7 @@ public class ActionGroupingTest {
 
   @Test
   public void FailedActionsDifferentResults() throws IOException, ParamException {
-    ActionGrouping grouping = new ActionGrouping();
+    ActionGrouping.Builder grouping = new ActionGrouping.Builder();
     grouping.addLogEntry(
         addDigest(
             getLogEntry("12345", "Execute", 10, makeGetActionResult(actionResultFail)),
@@ -404,7 +413,7 @@ public class ActionGroupingTest {
             getLogEntry("987", "Execute", 10, makeGetActionResult(actionResultSuccess)), "987/22"));
     grouping.addLogEntry(
         addDigest(getLogEntry("345", "Execute", 10, makeExecute(actionResultFail)), "345/1"));
-    List<Digest> result = grouping.failedActions();
+    List<Digest> result = grouping.build().failedActions();
 
     List<Digest> expected = Arrays.asList(toDigest("12345/56"), toDigest("345/1"));
     assertThat(result).isEqualTo(expected);
@@ -412,10 +421,10 @@ public class ActionGroupingTest {
 
   @Test
   public void FailedActionsGetsDigestFromGetActionResult() throws IOException, ParamException {
-    ActionGrouping grouping = new ActionGrouping();
+    ActionGrouping.Builder grouping = new ActionGrouping.Builder();
     grouping.addLogEntry(makeFailedGetActionResult(10, "12345/88"));
     grouping.addLogEntry(getLogEntry("12345", "Execute", 10, makeWatch(actionResultFail)));
-    List<Digest> result = grouping.failedActions();
+    List<Digest> result = grouping.build().failedActions();
 
     List<Digest> expected = Arrays.asList(toDigest("12345/88"));
     assertThat(result).isEqualTo(expected);
@@ -423,13 +432,13 @@ public class ActionGroupingTest {
 
   @Test
   public void FailedActionsGetsDigestFromExecute() throws IOException, ParamException {
-    ActionGrouping grouping = new ActionGrouping();
+    ActionGrouping.Builder grouping = new ActionGrouping.Builder();
     grouping.addLogEntry(
         addDigest(
             getLogEntry("12345", "Execute", 10, makeExecute(ActionResult.getDefaultInstance())),
             "12345/1"));
     grouping.addLogEntry(getLogEntry("12345", "Execute", 10, makeWatch(actionResultFail)));
-    List<Digest> result = grouping.failedActions();
+    List<Digest> result = grouping.build().failedActions();
 
     List<Digest> expected = Arrays.asList(toDigest("12345/1"));
     assertThat(result).isEqualTo(expected);
@@ -437,14 +446,14 @@ public class ActionGroupingTest {
 
   @Test
   public void FailedActionsDoesntGetDigestFromWrongExecute() throws IOException, ParamException {
-    ActionGrouping grouping = new ActionGrouping();
+    ActionGrouping.Builder grouping = new ActionGrouping.Builder();
     grouping.addLogEntry(
         addDigest(
             getLogEntry(
                 "wrong_action", "Execute", 10, makeExecute(ActionResult.getDefaultInstance())),
             "12345/1"));
     grouping.addLogEntry(getLogEntry("12345", "Execute", 10, makeWatch(actionResultFail)));
-    List<Digest> result = grouping.failedActions();
+    List<Digest> result = grouping.build().failedActions();
 
     assertThat(result).isEmpty();
   }
