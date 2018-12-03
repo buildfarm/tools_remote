@@ -104,22 +104,23 @@ public class LogParserUtils {
     return null;
   }
 
-  private static List<ActionResult> extractResult(List<Operation> operations) throws IOException {
-    ArrayList<ActionResult> result = new ArrayList<>();
+  private static List<ExecuteResponse> extractExecuteResponse(List<Operation> operations) throws IOException {
+    ArrayList<ExecuteResponse> result = new ArrayList<>();
     for (Operation o : operations) {
       StringBuilder error = new StringBuilder();
       ExecuteResponse response = LogParserUtils.getExecuteResponse(o, ExecuteResponse.class, error);
-      if (response != null && response.hasResult()) {
-        result.add(response.getResult());
+      if (response != null && (response.hasResult() || (response.hasStatus()) && response.getStatus().getCode() != Code.OK.value())) {
+        result.add(response);
       }
     }
     return result;
   }
 
-  // Returns a list of ActionResult messages contained in the log entry,
-  // an empty list if there are none
-  //
-  public static List<ActionResult> extractResult(LogEntry entry) throws IOException {
+  // Returns a list of ExecuteResponse messages contained in the log entry,
+  // an empty list if there are none.
+  // If the LogEntry contains a successful cache lookup, an ExecuteResponse is constructed
+  // with that ActionResult and cached_result set to true.
+  public static List<ExecuteResponse> extractExecuteResponse(LogEntry entry) throws IOException {
     if (!entry.hasDetails()) {
       return Collections.emptyList();
     }
@@ -128,11 +129,15 @@ public class LogParserUtils {
     }
     RpcCallDetails details = entry.getDetails();
     if (details.hasExecute()) {
-      return extractResult(details.getExecute().getResponsesList());
+      return extractExecuteResponse(details.getExecute().getResponsesList());
     } else if (details.hasWaitExecution()) {
-      return extractResult(details.getWaitExecution().getResponsesList());
+      return extractExecuteResponse(details.getWaitExecution().getResponsesList());
     } else if (details.hasGetActionResult()) {
-      return Arrays.asList(details.getGetActionResult().getResponse());
+      ExecuteResponse response = ExecuteResponse.newBuilder()
+          .setResult(details.getGetActionResult().getResponse())
+          .setCachedResult(true)
+          .build();
+      return Arrays.asList(response);
     }
     return Collections.emptyList();
   }

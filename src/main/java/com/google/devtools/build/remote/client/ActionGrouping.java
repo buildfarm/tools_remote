@@ -2,11 +2,13 @@ package com.google.devtools.build.remote.client;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.ExecuteResponse;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Multiset;
 import com.google.common.collect.TreeMultiset;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
 import com.google.protobuf.util.Timestamps;
+import io.grpc.Status;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -31,7 +33,7 @@ final class ActionGrouping {
     Multiset<LogEntry> log;
     Digest digest;
     String actionId;
-    ActionResult actionResult;
+    ExecuteResponse executeResponse;
 
     private ActionDetails() {}
 
@@ -39,14 +41,26 @@ final class ActionGrouping {
       return digest;
     }
 
-    public ActionResult getActionResult() {
-      return actionResult;
+    public ExecuteResponse getExecuteResponse() {
+      return executeResponse;
     }
 
     // We will consider an action to be failed if we successfully got an action result but the exit
     // code is non-zero
     boolean isFailed() {
-      return actionResult != null && actionResult.getExitCode() != 0;
+      if(executeResponse == null) {
+        // Action was not successfully completed (either cancelled or RPC error)
+        // We don't know if it's a failing action.
+        return false;
+      }
+
+      if(executeResponse.hasStatus() && executeResponse.getStatus().getCode() != Status.Code.OK.value()) {
+        // Errors such as PERMISSION_DENIED or DEADLINE_EXCEEDED
+        return true;
+      }
+
+      // Return true if the action was not successful
+      return executeResponse.hasResult() && executeResponse.getResult().getExitCode() != 0;
     }
 
     Iterable<? extends LogEntry> getSortedElements() {
@@ -57,7 +71,7 @@ final class ActionGrouping {
       Multiset<LogEntry> log;
       Digest digest;
       String actionId;
-      ActionResult actionResult;
+      ExecuteResponse executeResponse;
 
       public Builder(String actionId) {
         log =
@@ -89,14 +103,14 @@ final class ActionGrouping {
           digest = d;
         }
 
-        List<ActionResult> r = LogParserUtils.extractResult(entry);
+        List<ExecuteResponse> r = LogParserUtils.extractExecuteResponse(entry);
         if (r.size() > 0) {
-          if (actionResult != null) {
+          if (executeResponse != null) {
             System.err.println(
                 "Warning: unexpected log format: multiple action results for action "
-                    + actionResult);
+                    + actionId);
           }
-          actionResult = r.get(r.size() - 1);
+          executeResponse = r.get(r.size() - 1);
         }
       }
 
@@ -106,7 +120,7 @@ final class ActionGrouping {
         result.log = this.log;
         result.digest = this.digest;
         result.actionId = this.actionId;
-        result.actionResult = this.actionResult;
+        result.executeResponse = this.executeResponse;
 
         return result;
       }

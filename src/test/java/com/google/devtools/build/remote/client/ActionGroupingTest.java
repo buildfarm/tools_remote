@@ -32,6 +32,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.util.Timestamps;
 import io.grpc.Status;
+import io.grpc.Status.Code;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -251,6 +252,15 @@ public class ActionGroupingTest {
     return RpcCallDetails.newBuilder().setExecute(execute).build();
   }
 
+  private RpcCallDetails makeExecuteWithStatus(int status) {
+    ExecuteResponse.Builder response = ExecuteResponse.newBuilder();
+    response.getStatusBuilder().setCode(status);
+    Operation operation =
+        Operation.newBuilder().setResponse(Any.pack(response.build())).setDone(true).build();
+    ExecuteDetails execute = ExecuteDetails.newBuilder().addResponses(operation).build();
+    return RpcCallDetails.newBuilder().setExecute(execute).build();
+  }
+
   private RpcCallDetails makeWatch(ActionResult result) {
     ExecuteResponse response = ExecuteResponse.newBuilder().setResult(result).build();
     Operation operation =
@@ -287,70 +297,75 @@ public class ActionGroupingTest {
   public void ActionResultForEmpty() {
     ActionDetails.Builder detailsBuilder = new ActionDetails.Builder("actionId");
     ActionDetails details = detailsBuilder.build();
-    // Action with no log entries is not failed but has no actionResult
-    assert (details.getActionResult() == null);
+    // Action with no log entries is not failed but has no executeResponse
+    assert (details.getExecuteResponse() == null);
     assert (!details.isFailed());
   };
 
   @Test
   public void ActionResultFromCachePass() throws IOException {
     ActionDetails.Builder detailsBuilder = new ActionDetails.Builder("actionId");
-    // Action with no log entries is not failed but has no actionResult
     detailsBuilder.add(
         getLogEntry("actionId", "Execute", 10, makeGetActionResult(actionResultSuccess)));
     ActionDetails details = detailsBuilder.build();
-    assert (details.getActionResult() != null);
+    assert (details.getExecuteResponse() != null);
     assert (!details.isFailed());
   };
 
   @Test
   public void ActionResultFromCacheFail() throws IOException {
     ActionDetails.Builder detailsBuilder = new ActionDetails.Builder("actionId");
-    // Action with no log entries is not failed but has no actionResult
     detailsBuilder.add(
         getLogEntry("actionId", "Execute", 10, makeGetActionResult(actionResultFail)));
     ActionDetails details = detailsBuilder.build();
-    assert (details.getActionResult() != null);
+    assert (details.getExecuteResponse() != null);
     assert (details.isFailed());
   };
 
   @Test
   public void ActionResultFromExecutePass() throws IOException {
     ActionDetails.Builder detailsBuilder = new ActionDetails.Builder("actionId");
-    // Action with no log entries is not failed but has no actionResult
     detailsBuilder.add(getLogEntry("actionId", "Execute", 10, makeExecute(actionResultSuccess)));
     ActionDetails details = detailsBuilder.build();
-    assert (details.getActionResult() != null);
+    assert (details.getExecuteResponse() != null);
     assert (!details.isFailed());
   };
 
   @Test
   public void ActionResultFromExecuteFail() throws IOException {
     ActionDetails.Builder detailsBuilder = new ActionDetails.Builder("actionId");
-    // Action with no log entries is not failed but has no actionResult
     detailsBuilder.add(getLogEntry("actionId", "Execute", 10, makeExecute(actionResultFail)));
     ActionDetails details = detailsBuilder.build();
-    assert (details.getActionResult() != null);
+    assert (details.getExecuteResponse() != null);
     assert (details.isFailed());
   };
 
   @Test
+  public void ActionResultFromExecuteError() throws IOException {
+    ActionDetails.Builder detailsBuilder = new ActionDetails.Builder("actionId");
+    detailsBuilder.add(getLogEntry("actionId", "Execute", 10,
+        makeExecuteWithStatus(Code.DEADLINE_EXCEEDED.value())));
+    ActionDetails details = detailsBuilder.build();
+    assert (details.getExecuteResponse() != null);
+    assert (details.isFailed());
+  };
+
+
+  @Test
   public void ActionResultFromWatchPass() throws IOException {
     ActionDetails.Builder detailsBuilder = new ActionDetails.Builder("actionId");
-    // Action with no log entries is not failed but has no actionResult
     detailsBuilder.add(getLogEntry("actionId", "Execute", 10, makeWatch(actionResultSuccess)));
     ActionDetails details = detailsBuilder.build();
-    assert (details.getActionResult() != null);
+    assert (details.getExecuteResponse() != null);
     assert (!details.isFailed());
   };
 
   @Test
   public void ActionResultFromWatchFail() throws IOException {
     ActionDetails.Builder detailsBuilder = new ActionDetails.Builder("actionId");
-    // Action with no log entries is not failed but has no actionResult
     detailsBuilder.add(getLogEntry("actionId", "Execute", 10, makeWatch(actionResultFail)));
     ActionDetails details = detailsBuilder.build();
-    assert (details.getActionResult() != null);
+    assert (details.getExecuteResponse() != null);
     assert (details.isFailed());
   };
 
