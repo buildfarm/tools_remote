@@ -29,12 +29,18 @@ final class ActionGrouping {
 
   @VisibleForTesting
   static class ActionDetails {
-    Multiset<LogEntry> log;
-    Digest digest;
-    String actionId;
-    ExecuteResponse executeResponse;
+    final Multiset<LogEntry> log;
+    final Digest digest;
+    final String actionId;
+    final ExecuteResponse executeResponse;
 
-    private ActionDetails() {}
+    private ActionDetails(
+        Multiset<LogEntry> log, Digest digest, String actionId, ExecuteResponse executeResponse) {
+      this.log = log;
+      this.digest = digest;
+      this.actionId = actionId;
+      this.executeResponse = executeResponse;
+    }
 
     Digest getDigest() {
       return digest;
@@ -114,22 +120,20 @@ final class ActionGrouping {
       }
 
       ActionDetails build() {
-        ActionDetails result = new ActionDetails();
-
-        result.log = this.log;
-        result.digest = this.digest;
-        result.actionId = this.actionId;
-        result.executeResponse = this.executeResponse;
-
-        return result;
+        return new ActionDetails(log, digest, actionId, executeResponse);
       }
     }
   };
 
-  private Map<String, ActionDetails> actionMap = new LinkedHashMap<>();
+  private final Map<String, ActionDetails> actionMap;
 
   // True if found V1 entries in the log.
   private boolean V1found = false;
+
+  private ActionGrouping(boolean V1found, Map<String, ActionDetails> actionMap) {
+    this.V1found = V1found;
+    this.actionMap = actionMap;
+  };
 
   void printByAction(PrintWriter out) throws IOException {
     for (String hash : actionMap.keySet()) {
@@ -166,8 +170,6 @@ final class ActionGrouping {
 
     return result;
   }
-
-  private ActionGrouping() {};
 
   public static class Builder {
     private Map<String, ActionDetails.Builder> actionMap = new LinkedHashMap<>();
@@ -210,10 +212,7 @@ final class ActionGrouping {
                       },
                       LinkedHashMap::new));
 
-      ActionGrouping result = new ActionGrouping();
-      result.V1found = this.V1found;
-      result.actionMap = builtActionMap;
-      return result;
+      return new ActionGrouping(V1found, builtActionMap);
     }
   }
 }
