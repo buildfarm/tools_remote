@@ -343,13 +343,13 @@ public class ActionGroupingTest {
   @Test
   public void ActionResultFromExecuteError() throws IOException {
     ActionDetails.Builder detailsBuilder = new ActionDetails.Builder("actionId");
-    detailsBuilder.add(getLogEntry("actionId", "Execute", 10,
-        makeExecuteWithStatus(Code.DEADLINE_EXCEEDED.value())));
+    detailsBuilder.add(
+        getLogEntry(
+            "actionId", "Execute", 10, makeExecuteWithStatus(Code.DEADLINE_EXCEEDED.value())));
     ActionDetails details = detailsBuilder.build();
     assert (details.getExecuteResponse() != null);
     assert (details.isFailed());
   };
-
 
   @Test
   public void ActionResultFromWatchPass() throws IOException {

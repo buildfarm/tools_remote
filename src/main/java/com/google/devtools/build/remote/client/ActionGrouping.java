@@ -1,6 +1,5 @@
 package com.google.devtools.build.remote.client;
 
-import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import com.google.common.annotations.VisibleForTesting;
@@ -48,13 +47,14 @@ final class ActionGrouping {
     // We will consider an action to be failed if we successfully got an action result but the exit
     // code is non-zero
     boolean isFailed() {
-      if(executeResponse == null) {
+      if (executeResponse == null) {
         // Action was not successfully completed (either cancelled or RPC error)
         // We don't know if it's a failing action.
         return false;
       }
 
-      if(executeResponse.hasStatus() && executeResponse.getStatus().getCode() != Status.Code.OK.value()) {
+      if (executeResponse.hasStatus()
+          && executeResponse.getStatus().getCode() != Status.Code.OK.value()) {
         // Errors such as PERMISSION_DENIED or DEADLINE_EXCEEDED
         return true;
       }
@@ -107,8 +107,7 @@ final class ActionGrouping {
         if (r.size() > 0) {
           if (executeResponse != null) {
             System.err.println(
-                "Warning: unexpected log format: multiple action results for action "
-                    + actionId);
+                "Warning: unexpected log format: multiple action results for action " + actionId);
           }
           executeResponse = r.get(r.size() - 1);
         }

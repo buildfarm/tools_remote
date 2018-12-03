@@ -16,7 +16,6 @@ package com.google.devtools.build.remote.client;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
@@ -104,12 +103,15 @@ public class LogParserUtils {
     return null;
   }
 
-  private static List<ExecuteResponse> extractExecuteResponse(List<Operation> operations) throws IOException {
+  private static List<ExecuteResponse> extractExecuteResponse(List<Operation> operations)
+      throws IOException {
     ArrayList<ExecuteResponse> result = new ArrayList<>();
     for (Operation o : operations) {
       StringBuilder error = new StringBuilder();
       ExecuteResponse response = LogParserUtils.getExecuteResponse(o, ExecuteResponse.class, error);
-      if (response != null && (response.hasResult() || (response.hasStatus()) && response.getStatus().getCode() != Code.OK.value())) {
+      if (response != null
+          && (response.hasResult()
+              || (response.hasStatus()) && response.getStatus().getCode() != Code.OK.value())) {
         result.add(response);
       }
     }
@@ -133,10 +135,11 @@ public class LogParserUtils {
     } else if (details.hasWaitExecution()) {
       return extractExecuteResponse(details.getWaitExecution().getResponsesList());
     } else if (details.hasGetActionResult()) {
-      ExecuteResponse response = ExecuteResponse.newBuilder()
-          .setResult(details.getGetActionResult().getResponse())
-          .setCachedResult(true)
-          .build();
+      ExecuteResponse response =
+          ExecuteResponse.newBuilder()
+              .setResult(details.getGetActionResult().getResponse())
+              .setCachedResult(true)
+              .build();
       return Arrays.asList(response);
     }
     return Collections.emptyList();
