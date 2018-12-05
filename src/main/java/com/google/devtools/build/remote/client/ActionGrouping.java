@@ -50,8 +50,9 @@ final class ActionGrouping {
       return executeResponse;
     }
 
-    // We will consider an action to be failed if we successfully got an action result but the exit
-    // code is non-zero
+    // We will consider an action to be failed if either:
+    //  - we successfully received the execution result but the status is non-zero
+    //  - we successfully received the action result but the exit code is non-zero
     boolean isFailed() {
       if (executeResponse == null) {
         // Action was not successfully completed (either cancelled or RPC error)
@@ -111,7 +112,12 @@ final class ActionGrouping {
 
         List<ExecuteResponse> r = LogParserUtils.extractExecuteResponse(entry);
         if (r.size() > 0) {
-          if (executeResponse != null) {
+          if(r.size() > 1) {
+            System.err.println(
+                "Warning: unexpected log format: multiple ExecutionResponse for action " + actionId
+                    + " in LogEntry " + entry);
+          }
+          if (executeResponse != null && executeResponse.hasResult()) {
             System.err.println(
                 "Warning: unexpected log format: multiple action results for action " + actionId);
           }

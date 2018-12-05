@@ -108,7 +108,7 @@ public class LogParserUtils {
     ArrayList<ExecuteResponse> result = new ArrayList<>();
     for (Operation o : operations) {
       StringBuilder error = new StringBuilder();
-      ExecuteResponse response = LogParserUtils.getExecuteResponse(o, ExecuteResponse.class, error);
+      ExecuteResponse response = getExecuteResponse(o, ExecuteResponse.class, error);
       if (response != null
           && (response.hasResult()
               || (response.hasStatus()) && response.getStatus().getCode() != Code.OK.value())) {

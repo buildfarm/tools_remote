@@ -73,9 +73,10 @@ actions:
     $ bazel-bin/remote_client --grpc_log PATH_TO_LOG failed_actions
 
 For the purpose of this command, a failed action is any action whose execute
-response returned a non-zero status. This does not include actions whose
-*execution* failed, for example, when remote execution was unavailable or
-returned internal errors.
+response returned a non-zero exit status or a non-zero status code (for example, DEADLINE_EXCEEDED).
+An action that has been successfully retried will not be included.
+Any action that did not obtain an execute response will not be included - this could happen, for
+example, when remote execution was unavailable.
 
 
 ### Running Actions in Docker
