@@ -105,11 +105,33 @@ message ExecuteDetails {
 }
 
 // Details for a call to
+// build.bazel.remote.execution.v2.ActionCache.GetCapabilities.
+message GetCapabilitiesDetails {
+  // The build.bazel.remote.execution.v2.GetCapabilitiesRequest sent by
+  // the call.
+  build.bazel.remote.execution.v2.GetCapabilitiesRequest request = 1;
+
+  // The received build.bazel.remote.execution.v2.ServerCapabilities.
+  build.bazel.remote.execution.v2.ServerCapabilities response = 2;
+}
+
+// Details for a call to
 // build.bazel.remote.execution.v2.ActionCache.GetActionResult.
 message GetActionResultDetails {
   // The build.bazel.remote.execution.v2.GetActionResultRequest sent by
   // the call.
   build.bazel.remote.execution.v2.GetActionResultRequest request = 1;
+
+  // The received build.bazel.remote.execution.v2.ActionResult.
+  build.bazel.remote.execution.v2.ActionResult response = 2;
+}
+
+// Details for a call to
+// build.bazel.remote.execution.v2.ActionCache.UpdateActionResult.
+message UpdateActionResultDetails {
+  // The build.bazel.remote.execution.v2.GetActionResultRequest sent by
+  // the call.
+  build.bazel.remote.execution.v2.UpdateActionResultRequest request = 1;
 
   // The received build.bazel.remote.execution.v2.ActionResult.
   build.bazel.remote.execution.v2.ActionResult response = 2;
@@ -184,5 +206,7 @@ message RpcCallDetails {
     FindMissingBlobsDetails find_missing_blobs = 10;
     ReadDetails read = 5;
     WriteDetails write = 6;
+    GetCapabilitiesDetails get_capabilities = 12;
+    UpdateActionResultDetails update_action_result = 13;
   }
 }

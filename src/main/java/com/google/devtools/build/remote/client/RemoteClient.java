@@ -34,7 +34,9 @@ import com.beust.jcommander.JCommander;
 import com.beust.jcommander.ParameterException;
 import com.google.common.hash.Hashing;
 import com.google.common.io.Files;
+import com.google.devtools.build.remote.client.LogParserUtils.ParamException;
 import com.google.devtools.build.remote.client.RemoteClientOptions.CatCommand;
+import com.google.devtools.build.remote.client.RemoteClientOptions.FailedActionsCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.GetDirCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.GetOutDirCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.LsCommand;
@@ -418,6 +420,12 @@ public class RemoteClient {
     parser.printLog(options);
   }
 
+  private static void doFailedActions(String grpcLogFile, FailedActionsCommand options)
+      throws IOException, ParamException {
+    LogParserUtils parser = new LogParserUtils(grpcLogFile);
+    parser.printFailedActions();
+  }
+
   private static void doLs(LsCommand options, RemoteClient client) throws IOException {
     Tree tree = client.getCache().getTree(options.digest);
     client.listTree(Paths.get(""), tree, options.limit);
@@ -493,7 +501,8 @@ public class RemoteClient {
     client.printActionResult(builder.build(), options.limit);
   }
 
-  private static void doRun(RunCommand options, RemoteClient client) throws IOException {
+  private static void doRun(String grpcLogFile, RunCommand options, RemoteClient client)
+      throws IOException, ParamException {
     Path path = options.path != null ? options.path : Files.createTempDir().toPath();
 
     if (options.file != null && options.actionDigest != null) {
@@ -504,6 +513,22 @@ public class RemoteClient {
       client.setupDocker(getActionV1FromFile(options.file), path);
     } else if (options.actionDigest != null) {
       client.setupDocker(client.getAction(options.actionDigest), path);
+    } else if (!grpcLogFile.isEmpty()) {
+      LogParserUtils parser = new LogParserUtils(grpcLogFile);
+      List<Digest> actions = parser.failedActions();
+      if (actions.size() == 0) {
+        System.err.println("No action specified. No failed actions found in GRPC log.");
+        System.exit(1);
+      } else if (actions.size() > 1) {
+        System.err.println(
+            "No action specified. Multiple failed actions found in GRPC log. Add one of the following options:");
+        for (Digest d : actions) {
+          System.err.println(" --digest " + d.getHash() + "/" + d.getSizeBytes());
+        }
+        System.exit(1);
+      }
+      Digest action = actions.get(0);
+      client.setupDocker(client.getAction(action), path);
     } else {
       System.err.println("Specify --file or --action_digest");
       System.exit(1);
@@ -531,6 +556,7 @@ public class RemoteClient {
     GetDirCommand getDirCommand = new GetDirCommand();
     GetOutDirCommand getOutDirCommand = new GetOutDirCommand();
     CatCommand catCommand = new CatCommand();
+    FailedActionsCommand failedActionsCommand = new FailedActionsCommand();
     ShowActionCommand showActionCommand = new ShowActionCommand();
     ShowActionResultCommand showActionResultCommand = new ShowActionResultCommand();
     PrintLogCommand printLogCommand = new PrintLogCommand();
@@ -551,6 +577,7 @@ public class RemoteClient {
             .addCommand("show_action_result", showActionResultCommand, "sar")
             .addCommand("printlog", printLogCommand)
             .addCommand("run", runCommand)
+            .addCommand("failed_actions", failedActionsCommand)
             .build();
 
     try {
@@ -599,7 +626,13 @@ public class RemoteClient {
             showActionResultCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
         break;
       case "run":
-        doRun(runCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
+        doRun(
+            remoteClientOptions.grpcLog,
+            runCommand,
+            makeClientWithOptions(remoteOptions, authAndTlsOptions));
+        break;
+      case "failed_actions":
+        doFailedActions(remoteClientOptions.grpcLog, failedActionsCommand);
         break;
       default:
         throw new IllegalArgumentException("Unknown command.");

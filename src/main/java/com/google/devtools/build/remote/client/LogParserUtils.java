@@ -16,7 +16,10 @@ package com.google.devtools.build.remote.client;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.ExecuteResponse;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
+import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.RpcCallDetails;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.V1WatchDetails;
 import com.google.devtools.build.remote.client.RemoteClientOptions.PrintLogCommand;
 import com.google.longrunning.Operation;
@@ -33,6 +36,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /** Methods for printing log files. */
@@ -61,14 +67,104 @@ public class LogParserUtils {
     return new FileInputStream(filename);
   }
 
+  // Returns an ExecuteResponse contained in the operation and null if none.
+  // If the operation contains an error, returns null and populates StringBuilder "error" with
+  // the error message.
+  public static <T extends Message> T getExecuteResponse(
+      Operation o, Class<T> t, StringBuilder error) throws IOException {
+    if (o.getResultCase() == ResultCase.ERROR && o.getError().getCode() != Code.OK.value()) {
+      error.append(o.getError().toString());
+      return null;
+    }
+    if (o.getResultCase() == ResultCase.RESPONSE && o.getDone()) {
+      return o.getResponse().unpack(t);
+    }
+    return null;
+  }
+
+  // Returns a Digest contained in the log entry, and null if none.
+  public static Digest extractDigest(LogEntry entry) {
+    if (!entry.hasDetails()) {
+      return null;
+    }
+    RpcCallDetails details = entry.getDetails();
+    if (details.hasExecute()) {
+      if (details.getExecute().hasRequest()
+          && details.getExecute().getRequest().hasActionDigest()) {
+        return details.getExecute().getRequest().getActionDigest();
+      }
+    }
+    if (details.hasGetActionResult()) {
+      if (details.getGetActionResult().hasRequest()
+          && details.getGetActionResult().getRequest().hasActionDigest()) {
+        return details.getGetActionResult().getRequest().getActionDigest();
+      }
+    }
+    return null;
+  }
+
+  private static List<ExecuteResponse> extractExecuteResponse(List<Operation> operations)
+      throws IOException {
+    ArrayList<ExecuteResponse> result = new ArrayList<>();
+    for (Operation o : operations) {
+      StringBuilder error = new StringBuilder();
+      ExecuteResponse response = getExecuteResponse(o, ExecuteResponse.class, error);
+      if (response != null
+          && (response.hasResult()
+              || (response.hasStatus()) && response.getStatus().getCode() != Code.OK.value())) {
+        result.add(response);
+      }
+    }
+    return result;
+  }
+
+  // Returns a list of ExecuteResponse messages contained in the log entry,
+  // an empty list if there are none.
+  // If the LogEntry contains a successful cache lookup, an ExecuteResponse is constructed
+  // with that ActionResult and cached_result set to true.
+  public static List<ExecuteResponse> extractExecuteResponse(LogEntry entry) throws IOException {
+    if (!entry.hasDetails()) {
+      return Collections.emptyList();
+    }
+    if (entry.getStatus().getCode() != Code.OK.value()) {
+      return Collections.emptyList();
+    }
+    RpcCallDetails details = entry.getDetails();
+    if (details.hasExecute()) {
+      return extractExecuteResponse(details.getExecute().getResponsesList());
+    } else if (details.hasWaitExecution()) {
+      return extractExecuteResponse(details.getWaitExecution().getResponsesList());
+    } else if (details.hasGetActionResult()) {
+      ExecuteResponse response =
+          ExecuteResponse.newBuilder()
+              .setResult(details.getGetActionResult().getResponse())
+              .setCachedResult(true)
+              .build();
+      return Arrays.asList(response);
+    }
+    return Collections.emptyList();
+  }
+
+  // Returns true iff the given details contains an entry of V1 API
+  public static boolean isV1Entry(RpcCallDetails details) {
+    return details.hasV1Execute()
+        || details.hasV1FindMissingBlobs()
+        || details.hasV1GetActionResult()
+        || details.hasV1Watch();
+  }
+
   private static <T extends Message> boolean maybePrintOperation(
       Operation o, PrintWriter out, Class<T> t) throws IOException {
-    if (o.getResultCase() == ResultCase.ERROR && o.getError().getCode() != Code.OK.value()) {
-      out.printf("Operation contained error: %s\n", o.getError().toString());
-      return true;
-    } else if (o.getResultCase() == ResultCase.RESPONSE && o.getDone()) {
+    StringBuilder error = new StringBuilder();
+    T result = getExecuteResponse(o, t, error);
+    if (result != null) {
       out.println("ExecuteResponse extracted:");
-      out.println(o.getResponse().unpack(t).toString());
+      out.println(result.toString());
+      return true;
+    }
+    String errString = error.toString();
+    if (!errString.isEmpty()) {
+      out.printf("Operation contained error: %s\n", o.getError().toString());
       return true;
     }
     return false;
@@ -140,15 +236,20 @@ public class LogParserUtils {
     }
   }
 
-  private void printEntriesGroupedByAction(OutputStream outStream)
-      throws IOException, ParamException {
-    ActionGrouping byAction = new ActionGrouping();
+  private ActionGrouping initActionGrouping() throws IOException, ParamException {
+    ActionGrouping.Builder result = new ActionGrouping.Builder();
     try (InputStream in = openGrpcFileInputStream()) {
       LogEntry entry;
       while ((entry = LogEntry.parseDelimitedFrom(in)) != null) {
-        byAction.addLogEntry(entry);
+        result.addLogEntry(entry);
       }
     }
+    return result.build();
+  }
+
+  private void printEntriesGroupedByAction(OutputStream outStream)
+      throws IOException, ParamException {
+    ActionGrouping byAction = initActionGrouping();
     PrintWriter out =
         new PrintWriter(new BufferedWriter(new OutputStreamWriter(outStream, UTF_8)), true);
     byAction.printByAction(out);
@@ -165,6 +266,26 @@ public class LogParserUtils {
     } catch (ParamException e) {
       System.err.println(e.getMessage());
       System.exit(1);
+    }
+  }
+
+  /** Returns a list of actions failed in the grpc log */
+  public List<Digest> failedActions() throws IOException, ParamException {
+    ActionGrouping a = initActionGrouping();
+    return a.failedActions();
+  }
+
+  /** Print a list of actions */
+  public void printFailedActions() throws IOException, ParamException {
+    PrintWriter out =
+        new PrintWriter(new BufferedWriter(new OutputStreamWriter(System.out, UTF_8)), true);
+    List<Digest> actions = failedActions();
+    if (actions.size() == 0) {
+      out.println("No failed actions found.");
+      return;
+    }
+    for (Digest d : actions) {
+      out.println("Failed action: " + d.getHash() + "/" + d.getSizeBytes());
     }
   }
 }
