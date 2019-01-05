@@ -1,5 +1,7 @@
 workspace(name = "remote_client")
 
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
 # Needed for "well-known protos" and @com_google_protobuf//:protoc.
 http_archive(
     name = "com_google_protobuf",
@@ -16,20 +18,20 @@ http_archive(
     urls = ["https://github.com/grpc/grpc-java/archive/d792a72ea15156254e3b3735668e9c4539837fd3.zip"],
 )
 
-new_http_archive(
+http_archive(
     name = "googleapis",
     sha256 = "7b6ea252f0b8fb5cd722f45feb83e115b689909bbb6a393a873b6cbad4ceae1d",
     url = "https://github.com/googleapis/googleapis/archive/143084a2624b6591ee1f9d23e7f5241856642f4d.zip",
     strip_prefix = "googleapis-143084a2624b6591ee1f9d23e7f5241856642f4d",
-    build_file = "BUILD.googleapis",
+    build_file = "@//:BUILD.googleapis",
 )
 
-new_http_archive(
+http_archive(
     name = "remoteapis",
     sha256 = "8ddb673b1346cc7c664bc3ff8b01060b2d2b5eede36d26439e2f1c658d8143f4",
     url = "https://github.com/bazelbuild/remote-apis/archive/998b8625d5947f272142037a1e52a61be33fcefb.zip",
     strip_prefix = "remote-apis-998b8625d5947f272142037a1e52a61be33fcefb",
-    build_file = "BUILD.remoteapis",
+    build_file = "@//:BUILD.remoteapis",
 )
 
 # Bazel toolchains
