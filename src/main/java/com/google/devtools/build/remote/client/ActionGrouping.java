@@ -103,7 +103,7 @@ final class ActionGrouping {
           if (digest != null && !d.equals(digest)) {
             System.err.println("Warning: conflicting digests: " + d + " and " + digest);
           }
-          if (digest != null && digest.getHash() != actionId) {
+          if (d != null && !d.getHash().equals(actionId)) {
             System.err.println(
                 "Warning: bad digest: " + d + " doesn't match action Id " + actionId);
           }

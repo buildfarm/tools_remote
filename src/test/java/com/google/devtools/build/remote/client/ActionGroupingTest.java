@@ -33,7 +33,9 @@ import com.google.protobuf.Any;
 import com.google.protobuf.util.Timestamps;
 import io.grpc.Status;
 import io.grpc.Status.Code;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Arrays;
@@ -471,5 +473,100 @@ public class ActionGroupingTest {
     List<Digest> result = grouping.build().failedActions();
 
     assertThat(result).isEmpty();
+  }
+
+  @FunctionalInterface
+  public interface ThrowingRunnable{
+    void run() throws Exception;
+  }
+
+
+
+  private String captureStderr(ThrowingRunnable r) throws Exception {
+    PrintStream oldErr = System.err;
+
+    String result = null;
+
+    final ByteArrayOutputStream stream = new ByteArrayOutputStream();
+    try (PrintStream ps = new PrintStream(stream)) {
+      System.setErr(ps);
+      r.run();
+      ps.flush();
+      result = stream.toString();
+    } finally {
+      System.setErr(oldErr);
+    }
+    return result;
+  }
+
+  @Test
+  public void DigestMismatchError() throws Exception {
+    // Mismatching action digest causes an error
+    String response = captureStderr(() -> {
+          ActionGrouping.Builder grouping = new ActionGrouping.Builder();
+          grouping.addLogEntry(
+              addDigest(
+                  getLogEntry(
+                      "12345", "Execute", 10, makeExecute(ActionResult.getDefaultInstance())),
+                  "12345/1"));
+          grouping.build();
+        });
+
+    assertThat(response).isEmpty();
+  }
+
+  @Test
+  public void DigestOk() throws Exception {
+    // Matching action digest is ok
+    String response = captureStderr(() -> {
+      ActionGrouping.Builder grouping = new ActionGrouping.Builder();
+      grouping.addLogEntry(
+          addDigest(
+              getLogEntry(
+                  "12345", "Execute", 10, makeExecute(ActionResult.getDefaultInstance())),
+              "wrong/1"));
+      grouping.build();
+    });
+
+    assertThat(response).contains("Warning: bad digest:");
+    assertThat(response).contains("wrong");
+    assertThat(response).contains("doesn't match action Id 12345");
+  }
+
+  @Test
+  public void MultipleActionDigestOk() throws Exception {
+    // Mismatching action digests across actions cause error
+    String response = captureStderr(() -> {
+      ActionGrouping.Builder grouping = new ActionGrouping.Builder();
+      grouping.addLogEntry(makeFailedGetActionResult(10, "12345/1"));
+      grouping.addLogEntry(
+          addDigest(
+              getLogEntry(
+                  "12345", "Execute", 10, makeExecute(ActionResult.getDefaultInstance())),
+              "12345/1"));
+      grouping.build();
+    });
+
+    assertThat(response).isEmpty();
+  }
+
+  @Test
+  public void MultipleActionDigestMismatch() throws Exception {
+    // Matching action digests across actions are ok
+    String response = captureStderr(() -> {
+      ActionGrouping.Builder grouping = new ActionGrouping.Builder();
+      grouping.addLogEntry(makeFailedGetActionResult(10, "12345/1"));
+      grouping.addLogEntry(
+          addDigest(
+              getLogEntry(
+                  "12345", "Execute", 10, makeExecute(ActionResult.getDefaultInstance())),
+              "12345/2"));
+      grouping.build();
+    });
+
+    assertThat(response).contains("conflicting digests");
+    assertThat(response).contains("12345");
+    assertThat(response).contains("size_bytes: 2");
+    assertThat(response).contains("size_bytes: 1");
   }
 }
