@@ -195,7 +195,10 @@ public abstract class AbstractRemoteActionCache {
         }
       }
     }
-    setExecutable(path, isExecutable);
+    // setExecutable doesn't work on Windows, nor is it required.
+    if (!System.getProperty("os.name").startsWith("Windows")) {
+      setExecutable(path, isExecutable);
+    }
   }
 
   /**

@@ -267,8 +267,10 @@ public class GrpcRemoteCacheTest {
     assertThat(Files.isRegularFile(execRoot.resolve("test/foo"))).isTrue();
     assertThat(Files.isDirectory(execRoot.resolve("test/bar"))).isTrue();
     assertThat(Files.isRegularFile(execRoot.resolve("test/bar/foo"))).isTrue();
-    assertThat(isExecutable(execRoot.resolve("test/foo"))).isTrue();
-    assertThat(isExecutable(execRoot.resolve("test/bar/foo"))).isFalse();
+    if (!System.getProperty("os.name").startsWith("Windows")) {
+      assertThat(isExecutable(execRoot.resolve("test/foo"))).isTrue();
+      assertThat(isExecutable(execRoot.resolve("test/bar/foo"))).isFalse();
+    }
   }
 
   @Test
@@ -343,7 +345,9 @@ public class GrpcRemoteCacheTest {
     assertThat(Files.isDirectory(execRoot.resolve("test/bar"))).isTrue();
     assertThat(Files.exists(execRoot.resolve("test/bar/qux"))).isTrue();
     assertThat(Files.isRegularFile(execRoot.resolve("test/bar/qux"))).isTrue();
-    assertThat(isExecutable(execRoot.resolve("test/bar/qux"))).isTrue();
+    if (!System.getProperty("os.name").startsWith("Windows")) {
+      assertThat(isExecutable(execRoot.resolve("test/bar/qux"))).isTrue();
+    }
   }
 
   @Test
@@ -412,10 +416,12 @@ public class GrpcRemoteCacheTest {
 
     assertThat(Files.exists(execRoot.resolve("test/bar/wobble/qux"))).isTrue();
     assertThat(Files.isRegularFile(execRoot.resolve("test/bar/wobble/qux"))).isTrue();
-    assertThat(isExecutable(execRoot.resolve("test/bar/wobble/qux"))).isFalse();
 
     assertThat(Files.exists(execRoot.resolve("test/bar/qux"))).isTrue();
     assertThat(Files.isRegularFile(execRoot.resolve("test/bar/qux"))).isTrue();
-    assertThat(isExecutable(execRoot.resolve("test/bar/qux"))).isFalse();
+    if (!System.getProperty("os.name").startsWith("Windows")) {
+      assertThat(isExecutable(execRoot.resolve("test/bar/wobble/qux"))).isFalse();
+      assertThat(isExecutable(execRoot.resolve("test/bar/qux"))).isFalse();
+    }
   }
 }

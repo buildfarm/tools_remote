@@ -73,11 +73,19 @@ public class DockerUtilTest {
     DockerUtil util = new DockerUtil(new MockUidGetter(14242));
     String commandLine = util.getDockerCommand(command, "/tmp/test");
 
+    if (System.getProperty("os.name").startsWith("Windows")) {
+      assertThat(commandLine)
+          .isEqualTo(
+              "docker run -v /tmp/test:/tmp/test-docker "
+                  + "-w /tmp/test-docker -e 'PATH=/home/test' "
+                  + "gcr.io/image /bin/echo hello 'escape<'\\''>'");
+    } else {
       assertThat(commandLine)
           .isEqualTo(
               "docker run -u 14242 -v /tmp/test:/tmp/test-docker "
                   + "-w /tmp/test-docker -e 'PATH=/home/test' "
                   + "gcr.io/image /bin/echo hello 'escape<'\\''>'");
+    }
   }
 
   @Test(expected = IllegalArgumentException.class)
