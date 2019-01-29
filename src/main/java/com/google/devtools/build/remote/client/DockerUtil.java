@@ -111,7 +111,7 @@ public final class DockerUtil {
     commandElements.add("run");
 
     long uid = uidGetter.getUid();
-    if (uid >= 0) {
+    if (uid >= 0 && !System.getProperty("os.name").startsWith("Windows")) {
       commandElements.add("-u");
       commandElements.add(Long.toString(uid));
     }
