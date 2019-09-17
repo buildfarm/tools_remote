@@ -56,6 +56,6 @@ load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 
 protobuf_deps()
 
-load("//3rdparty:workspace.bzl", "maven_dependencies", "declare_maven")
+load("//3rdparty:workspace.bzl", "maven_dependencies")
 
-maven_dependencies(declare_maven)
+maven_dependencies()

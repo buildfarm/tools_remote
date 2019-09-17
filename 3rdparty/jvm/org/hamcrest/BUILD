@@ -1,11 +1,9 @@
 java_library(
     name = "hamcrest_core",
-    exports = [
-        "//external:jar/org/hamcrest/hamcrest_core"
-    ],
     visibility = [
-        "//visibility:public"
-    ]
+        "//3rdparty/jvm:__subpackages__",
+    ],
+    exports = [
+        "//external:jar/org/hamcrest/hamcrest_core",
+    ],
 )
-
-

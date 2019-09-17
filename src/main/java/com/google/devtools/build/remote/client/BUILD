@@ -32,5 +32,6 @@ java_library(
         "@googleapis//:google_watch_v1_java_proto",
         "@remoteapis//:remote_execution_java_grpc",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
+        "@remoteapis//build/bazel/semver:semver_java_proto",
     ],
 )
