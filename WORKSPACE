@@ -2,12 +2,19 @@ workspace(name = "remote_client")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
+http_archive(
+    name = "bazel_skylib",
+    sha256 = "9245b0549e88e356cd6a25bf79f97aa19332083890b7ac6481a2affb6ada9752",
+    strip_prefix = "bazel-skylib-0.9.0",
+    url = "https://github.com/bazelbuild/bazel-skylib/archive/0.9.0.tar.gz",
+)
+
 # Needed for "well-known protos" and @com_google_protobuf//:protoc.
 http_archive(
     name = "com_google_protobuf",
-    sha256 = "9510dd2afc29e7245e9e884336f848c8a6600a14ae726adb6befdb4f786f0be2",
-    strip_prefix = "protobuf-3.6.1.3",
-    urls = ["https://github.com/protocolbuffers/protobuf/archive/v3.6.1.3.zip"],
+    sha256 = "c90d9e13564c0af85fd2912545ee47b57deded6e5a97de80395b6d2d9be64854",
+    strip_prefix = "protobuf-3.9.1",
+    urls = ["https://github.com/protocolbuffers/protobuf/archive/v3.9.1.zip"],
 )
 
 # Needed for @grpc_java//compiler:grpc_java_plugin.
@@ -44,6 +51,11 @@ http_archive(
   strip_prefix = "bazel-toolchains-bc0091adceaf4642192a8dcfc46e3ae3e4560ea7",
   sha256 = "7e85a14821536bc24e04610d309002056f278113c6cc82f1059a609361812431",
 )
-load("//3rdparty:workspace.bzl", "maven_dependencies", "declare_maven")
 
-maven_dependencies(declare_maven)
+load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+
+protobuf_deps()
+
+load("//3rdparty:workspace.bzl", "maven_dependencies")
+
+maven_dependencies()

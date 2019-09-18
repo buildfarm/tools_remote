@@ -46,6 +46,7 @@ import com.google.devtools.build.remote.client.RemoteClientOptions.RunCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.ShowActionCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.ShowActionResultCommand;
 import com.google.protobuf.TextFormat;
+import io.grpc.Context;
 import io.grpc.Status;
 import java.io.File;
 import java.io.FileInputStream;
@@ -408,7 +409,7 @@ public class RemoteClient {
           RequestMetadata.newBuilder()
               .setToolDetails(ToolDetails.newBuilder().setToolName("remote_client"))
               .build();
-      TracingMetadataUtils.contextWithMetadata(metadata).attach();
+      Context prevContext = TracingMetadataUtils.contextWithMetadata(metadata).attach();
     } else {
       throw new UnsupportedOperationException("Only gRPC remote cache supported currently.");
     }

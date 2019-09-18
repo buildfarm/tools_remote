@@ -1,11 +1,9 @@
 java_library(
     name = "gson",
-    exports = [
-        "//external:jar/com/google/code/gson/gson"
-    ],
     visibility = [
-        "//visibility:public"
-    ]
+        "//3rdparty/jvm:__subpackages__",
+    ],
+    exports = [
+        "//external:jar/com/google/code/gson/gson",
+    ],
 )
-
-
