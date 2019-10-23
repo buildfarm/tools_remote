@@ -116,6 +116,7 @@ def java_grpc_library(name, srcs, deps, flavor=None,
       "@//3rdparty/jvm/io/grpc:grpc_stub",
       "@//3rdparty/jvm/io/grpc:grpc_protobuf",
       "@//3rdparty/jvm/com/google/guava",
+      "@//3rdparty/jvm/javax/annotation:javax_annotation_api",
   ]
   if flavor == "normal":
     added_deps += ["@//3rdparty/jvm/com/google/protobuf:protobuf_java"]
