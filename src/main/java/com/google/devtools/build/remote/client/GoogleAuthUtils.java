@@ -24,7 +24,6 @@ import io.grpc.auth.MoreCallCredentials;
 import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
-import io.grpc.util.RoundRobinLoadBalancerFactory;
 import io.netty.handler.ssl.SslContext;
 import java.io.File;
 import java.io.FileInputStream;
@@ -59,7 +58,7 @@ public final class GoogleAuthUtils {
       NettyChannelBuilder builder =
           NettyChannelBuilder.forTarget(target)
               .negotiationType(options.tlsEnabled ? NegotiationType.TLS : NegotiationType.PLAINTEXT)
-              .loadBalancerFactory(RoundRobinLoadBalancerFactory.getInstance());
+              .defaultLoadBalancingPolicy("round_robin");
       if (sslContext != null) {
         builder.sslContext(sslContext);
         if (options.tlsAuthorityOverride != null) {

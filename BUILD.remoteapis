@@ -4,7 +4,7 @@ licenses(["notice"])
 
 exports_files(["LICENSE"])
 
-load("@//third_party/grpc_java:java_grpc_library.bzl", "java_grpc_library")
+load("@io_grpc_grpc_java//:java_grpc_library.bzl", "java_grpc_library")
 
 java_grpc_library(
     name = "remote_execution_java_grpc",
