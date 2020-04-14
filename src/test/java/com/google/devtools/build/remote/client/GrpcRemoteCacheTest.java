@@ -75,6 +75,8 @@ public class GrpcRemoteCacheTest {
       Jimfs.newFileSystem(Configuration.unix().toBuilder().setAttributeViews("posix").build());
   private Path execRoot;
   private Server fakeServer;
+  private Context withEmptyMetadata;
+  private Context prevCtx;
 
   @Before
   public final void setUp() throws Exception {
@@ -91,12 +93,13 @@ public class GrpcRemoteCacheTest {
         RequestMetadata.newBuilder()
             .setToolDetails(ToolDetails.newBuilder().setToolName("TEST"))
             .build();
-    Context withEmptyMetaData = TracingMetadataUtils.contextWithMetadata(testMetadata);
-    withEmptyMetaData.attach();
+    withEmptyMetadata = TracingMetadataUtils.contextWithMetadata(testMetadata);
+    prevCtx = withEmptyMetadata.attach();
   }
 
   @After
   public void tearDown() throws Exception {
+    withEmptyMetadata.detach(prevCtx);
     fakeServer.shutdownNow();
     fakeServer.awaitTermination();
   }
