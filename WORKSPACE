@@ -104,7 +104,7 @@ maven_install(
         "com.google.truth:truth:0.44",
     ] + ["io.grpc:grpc-%s:1.26.0" % module for module in IO_GRPC_MODULES]
       + [
-        "io.netty:netty-handler:4.1.38.Final",
+        "io.netty:netty-handler:4.1.27.Final",
         "io.netty:netty-tcnative-boringssl-static:2.0.7.Final",
     ],
     repositories = [
