@@ -36,6 +36,7 @@ import com.google.common.hash.Hashing;
 import com.google.common.io.Files;
 import com.google.devtools.build.remote.client.LogParserUtils.ParamException;
 import com.google.devtools.build.remote.client.RemoteClientOptions.CatCommand;
+import com.google.devtools.build.remote.client.RemoteClientOptions.CpCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.FailedActionsCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.GetDirCommand;
 import com.google.devtools.build.remote.client.RemoteClientOptions.GetOutDirCommand;
@@ -52,6 +53,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.file.FileSystemAlreadyExistsException;
@@ -536,6 +538,12 @@ public class RemoteClient {
     }
   }
 
+  private static void doCp(CpCommand options, RemoteClient client) throws IOException {
+    try (InputStream src = new FileInputStream(options.file)) {
+      client.getCache().uploadBlob(options.digest, src);
+    }
+  }
+
   public static void main(String[] args) throws Exception {
     try {
       selectAndPerformCommand(args);
@@ -562,6 +570,7 @@ public class RemoteClient {
     ShowActionResultCommand showActionResultCommand = new ShowActionResultCommand();
     PrintLogCommand printLogCommand = new PrintLogCommand();
     RunCommand runCommand = new RunCommand();
+    CpCommand cpCommand = new CpCommand();
 
     JCommander optionsParser =
         JCommander.newBuilder()
@@ -579,6 +588,7 @@ public class RemoteClient {
             .addCommand("printlog", printLogCommand)
             .addCommand("run", runCommand)
             .addCommand("failed_actions", failedActionsCommand)
+            .addCommand("cp", cpCommand)
             .build();
 
     try {
@@ -634,6 +644,9 @@ public class RemoteClient {
         break;
       case "failed_actions":
         doFailedActions(remoteClientOptions.grpcLog, failedActionsCommand);
+        break;
+      case "cp":
+        doCp(cpCommand, makeClientWithOptions(remoteOptions, authAndTlsOptions));
         break;
       default:
         throw new IllegalArgumentException("Unknown command.");

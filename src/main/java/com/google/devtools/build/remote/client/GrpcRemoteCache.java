@@ -23,18 +23,29 @@ import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.bazel.remote.execution.v2.Tree;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
+import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
+import com.google.bytestream.ByteStreamProto.WriteRequest;
+import com.google.bytestream.ByteStreamProto.WriteResponse;
+import com.google.common.base.Preconditions;
+import com.google.common.io.ByteStreams;
+import com.google.common.util.concurrent.SettableFuture;
+import com.google.protobuf.ByteString;
 import io.grpc.CallCredentials;
 import io.grpc.Channel;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.stub.StreamObserver;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
+import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 /** A RemoteActionCache implementation that uses gRPC calls to a remote cache server. */
@@ -75,6 +86,14 @@ public class GrpcRemoteCache extends AbstractRemoteActionCache {
 
   private ByteStreamBlockingStub bsBlockingStub() {
     return ByteStreamGrpc.newBlockingStub(channel)
+        .withInterceptors(TracingMetadataUtils.attachMetadataFromContextInterceptor())
+        .withCallCredentials(credentials)
+        .withDeadlineAfter(options.remoteTimeout, TimeUnit.SECONDS);
+  }
+
+
+  private ByteStreamStub bsAsyncStub() {
+    return ByteStreamGrpc.newStub(channel)
         .withInterceptors(TracingMetadataUtils.attachMetadataFromContextInterceptor())
         .withCallCredentials(credentials)
         .withDeadlineAfter(options.remoteTimeout, TimeUnit.SECONDS);
@@ -138,12 +157,25 @@ public class GrpcRemoteCache extends AbstractRemoteActionCache {
     readBlob(digest, stream);
   }
 
-  private void readBlob(Digest digest, OutputStream stream) throws IOException {
-    String resourceName = "";
+  private String getResourceNameForRead(Digest digest) {
+    // For reads, `resource_name` must be of form
+    //   `[<instance_name>/]blobs/<hash>/<size>`.
+    // https://github.com/bazelbuild/remote-apis/blob/f54876595da9f2c2d66c98c318d00b60fd64900b/build/bazel/remote/execution/v2/remote_execution.proto#L232
+    StringBuilder resourceName = new StringBuilder();
     if (!options.remoteInstanceName.isEmpty()) {
-      resourceName += options.remoteInstanceName + "/";
+      resourceName.append(options.remoteInstanceName).append('/');
     }
-    resourceName += "blobs/" + digest.getHash() + "/" + digest.getSizeBytes();
+    resourceName
+        .append("blobs")
+        .append('/')
+        .append(digest.getHash())
+        .append('/')
+        .append(digest.getSizeBytes());
+    return resourceName.toString();
+  }
+
+  private void readBlob(Digest digest, OutputStream stream) throws IOException {
+    String resourceName = getResourceNameForRead(digest);
     try {
       Iterator<ReadResponse> replies =
           bsBlockingStub().read(ReadRequest.newBuilder().setResourceName(resourceName).build());
@@ -155,6 +187,143 @@ public class GrpcRemoteCache extends AbstractRemoteActionCache {
         throw new CacheNotFoundException(digest);
       }
       throw e;
+    }
+  }
+
+  private String getResourceNameForWrite(Digest digest) {
+    // For writes, `resource_name` must be of form
+    //   `[<instance_name>/]uploads/<uuid>/blobs/<hash>/<size>[/<metadata>]`.
+    // https://github.com/bazelbuild/remote-apis/blob/f54876595da9f2c2d66c98c318d00b60fd64900b/build/bazel/remote/execution/v2/remote_execution.proto#L194
+    StringBuilder resourceName = new StringBuilder();
+    if (!options.remoteInstanceName.isEmpty()) {
+      resourceName.append(options.remoteInstanceName).append('/');
+    }
+    resourceName
+        .append("uploads")
+        .append('/')
+        .append(UUID.randomUUID().toString())
+        .append('/')
+        .append("blobs")
+        .append('/')
+        .append(digest.getHash())
+        .append('/')
+        .append(digest.getSizeBytes());
+    return resourceName.toString();
+  }
+
+  @Override
+  public void uploadBlob(Digest digest, InputStream source) throws IOException {
+    if (digest.getSizeBytes() < 1) {
+      // The empty file is always available in the CAS.
+      return;
+    }
+
+    SettableFuture<WriteResponse> result = SettableFuture.create();
+    StreamObserver<WriteRequest> streamObserver =
+        bsAsyncStub().write(new StreamObserver<WriteResponse>() {
+          private WriteResponse writeResponse = null;
+          @Override
+          public void onNext(WriteResponse writeResponse) {
+            Preconditions.checkState(this.writeResponse == null);
+            this.writeResponse = writeResponse;
+          }
+
+          @Override
+          public void onCompleted() {
+            Preconditions.checkState(this.writeResponse != null);
+            result.set(this.writeResponse);
+          }
+
+          @Override
+          public void onError(Throwable throwable) {
+            Preconditions.checkState(this.writeResponse == null);
+            result.setException(throwable);
+          }
+        });
+    try (OutputStream dest =
+             new ByteStreamServiceOutputStream(streamObserver, digest)) {
+      ByteStreams.copy(source, dest);
+    }
+
+    try {
+      WriteResponse response = result.get();
+      if (response.getCommittedSize() != digest.getSizeBytes()) {
+        throw new IOException(
+            String.format(
+                "Committed size of %d is different from digest size of %d",
+                response.getCommittedSize(),
+                digest.getSizeBytes()));
+      }
+    } catch (InterruptedException e) {
+      throw new IOException(e);
+    } catch (ExecutionException e) {
+      throw new IOException(e);
+    }
+  }
+
+  private class ByteStreamServiceOutputStream extends OutputStream {
+    private final StreamObserver<WriteRequest> streamObserver;
+    private final Digest digest;
+    private final String resourceName;
+
+    private long writeOffset = 0;
+
+    public ByteStreamServiceOutputStream(
+        StreamObserver<WriteRequest> streamObserver, Digest digest) {
+      this.streamObserver = streamObserver;
+      this.digest = digest;
+      this.resourceName = getResourceNameForWrite(digest);
+    }
+
+    @Override
+    public void close() {
+      Preconditions.checkState(writeOffset == digest.getSizeBytes());
+      WriteRequest request =
+          WriteRequest.newBuilder()
+              .setResourceName(resourceName)
+              .setWriteOffset(writeOffset)
+              .setFinishWrite(true)
+              .build();
+      streamObserver.onNext(request);
+      streamObserver.onCompleted();
+    }
+
+    @Override
+    public void flush() {
+      // Nothing to do.
+    }
+
+    private void write(ByteString data) {
+      WriteRequest request =
+          WriteRequest.newBuilder()
+              .setResourceName(resourceName)
+              .setWriteOffset(writeOffset)
+              .setData(data)
+              .build();
+      streamObserver.onNext(request);
+      writeOffset += data.size();
+    }
+
+    @Override
+    public void write(byte[] b) {
+      write(ByteString.copyFrom(b));
+    }
+
+    @Override
+    public void write(byte[] b, int off, int len) {
+      Preconditions.checkArgument(off >= 0 && off < b.length);
+      Preconditions.checkArgument(len > 0 && len <= b.length);
+      Preconditions.checkArgument((off + len) <= b.length);
+
+      write(ByteString.copyFrom(b, off, len));
+    }
+
+    @Override
+    public void write(int b) {
+      Preconditions.checkArgument(b >= 0 && b < 256);
+
+      byte data[] = { (byte)b };
+      write(data);
     }
   }
 }

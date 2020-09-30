@@ -210,6 +210,26 @@ public final class RemoteClientOptions {
     public Path path = null;
   }
 
+  @Parameters(
+      commandDescription = "Copies a file to the CAS.",
+      separators = "=")
+  public static class CpCommand {
+    @Parameter(
+        names = {"--digest", "-d"},
+        required = true,
+        converter = DigestConverter.class,
+        description = "The digest in the format hex_hash/size_bytes of the blob to copy.")
+    // TODO(yannic): Infer digest from file.
+    public Digest digest = null;
+
+    @Parameter(
+        names = {"--file", "-o"},
+        required = true,
+        converter = FileConverter.class,
+        description = "Specifies a file to upload.")
+    public File file = null;
+  }
+
   /** Converter for hex_hash/size_bytes string to a Digest object. */
   public static class DigestConverter implements IStringConverter<Digest> {
     @Override

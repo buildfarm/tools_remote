@@ -22,6 +22,7 @@ import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.Tree;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -225,4 +226,10 @@ public abstract class AbstractRemoteActionCache {
    * @throws CacheNotFoundException in case of a cache miss.
    */
   public abstract void downloadBlob(Digest digest, OutputStream dest) throws IOException;
+
+  /**
+   * Uploads a single blob with the specified {@link Digest} from the {@link InputStream}
+   * into the CAS.
+   */
+  public abstract void uploadBlob(Digest digest, InputStream source) throws IOException;
 }
