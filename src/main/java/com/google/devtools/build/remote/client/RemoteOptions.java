@@ -14,8 +14,11 @@
 
 package com.google.devtools.build.remote.client;
 
+import com.beust.jcommander.DynamicParameter;
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
+import java.util.HashMap;
+import java.util.Map;
 
 /** Options for remote cache. */
 @Parameters(separators = "=")
@@ -42,4 +45,9 @@ public final class RemoteOptions {
       names = "--remote_instance_name",
       description = "Value to pass as instance_name in the remote execution API.")
   public String remoteInstanceName = "";
+
+  @DynamicParameter(
+      names = "--remote_header",
+      description = "Headers to be passed to the remote cache. Use multiple times for multiple headers.")
+  public Map<String, String> remoteHeaders = new HashMap<>();
 }
