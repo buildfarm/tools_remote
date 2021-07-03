@@ -40,9 +40,9 @@ http_archive(
     patch_args = ["-p1"],
     patches = ["@remote_client//third_party/remoteapis:remoteapis.patch"],
     build_file = "@remote_client//:BUILD.remoteapis",
-    sha256 = "e779aa544c5fc94365c07023974d8fc5894f24df04d901bdf6033ebe01a5a5e5",
-    strip_prefix = "remote-apis-1b16ed76965afa8bb229ba22b90745c546416443",
-    url = "https://github.com/bazelbuild/remote-apis/archive/1b16ed76965afa8bb229ba22b90745c546416443.zip",
+    sha256 = "3c56ee449b95e35c95685d311711a3d306ed483396fb48f56cdd171f007148bd",
+    strip_prefix = "remote-apis-3e385366f152e99adda5ab5e4857b1ab221ba2fe",
+    url = "https://github.com/bazelbuild/remote-apis/archive/3e385366f152e99adda5ab5e4857b1ab221ba2fe.zip",
 )
 
 http_archive(
