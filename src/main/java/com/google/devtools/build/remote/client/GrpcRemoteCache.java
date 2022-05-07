@@ -26,15 +26,19 @@ import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
 import io.grpc.CallCredentials;
+import io.grpc.ClientInterceptor;
 import io.grpc.Channel;
+import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.stub.MetadataUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /** A RemoteActionCache implementation that uses gRPC calls to a remote cache server. */
@@ -66,16 +70,33 @@ public class GrpcRemoteCache extends AbstractRemoteActionCache {
     return options.remoteCache != null;
   }
 
+  private static ClientInterceptor customHeadersInterceptor(Map<String, String> headers) {
+    Metadata metadata = new Metadata();
+    for (Map.Entry<String,String> entry : headers.entrySet()) {
+      metadata.put(
+        Metadata.Key.of(entry.getKey(), Metadata.ASCII_STRING_MARSHALLER),
+        entry.getValue()
+      );
+    }
+    return MetadataUtils.newAttachHeadersInterceptor(metadata);
+  }
+
   private ContentAddressableStorageBlockingStub casBlockingStub() {
     return ContentAddressableStorageGrpc.newBlockingStub(channel)
-        .withInterceptors(TracingMetadataUtils.attachMetadataFromContextInterceptor())
+        .withInterceptors(
+          TracingMetadataUtils.attachMetadataFromContextInterceptor(),
+          customHeadersInterceptor(options.remoteHeaders)
+        )
         .withCallCredentials(credentials)
         .withDeadlineAfter(options.remoteTimeout, TimeUnit.SECONDS);
   }
 
   private ByteStreamBlockingStub bsBlockingStub() {
     return ByteStreamGrpc.newBlockingStub(channel)
-        .withInterceptors(TracingMetadataUtils.attachMetadataFromContextInterceptor())
+        .withInterceptors(
+          TracingMetadataUtils.attachMetadataFromContextInterceptor(),
+          customHeadersInterceptor(options.remoteHeaders)
+        )
         .withCallCredentials(credentials)
         .withDeadlineAfter(options.remoteTimeout, TimeUnit.SECONDS);
   }
