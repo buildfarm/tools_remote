@@ -28,6 +28,7 @@ java_library(
         "@io_grpc_grpc_java//auth",
         "@io_grpc_grpc_java//context",
         "@io_grpc_grpc_java//core",
+        "@io_grpc_grpc_java//core:util",
         "@io_grpc_grpc_java//netty",
         "@io_grpc_grpc_java//protobuf",
         "@io_grpc_grpc_java//stub",
