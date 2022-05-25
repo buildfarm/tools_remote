@@ -242,7 +242,7 @@ public class LogParserUtils {
           }
       }
       // We want each entry to have it's own comma
-      return jsonString + ",";
+      return jsonString;
   }
 
   /**
@@ -270,8 +270,14 @@ public class LogParserUtils {
       PrintWriter out =
           new PrintWriter(new BufferedWriter(new OutputStreamWriter(outStream, UTF_8)), true);
       LogEntry entry;
+      boolean second_entry = false;
       while ((entry = LogEntry.parseDelimitedFrom(in)) != null) {
-        jsonString = jsonString.concat(protobufToJsonEntry(entry));
+        if(second_entry){
+          jsonString = jsonString.concat("," + protobufToJsonEntry(entry));
+        } else {
+          jsonString = jsonString.concat(protobufToJsonEntry(entry));
+        }
+        second_entry = true;
       }
       jsonString = jsonString.concat("]");
       System.out.print(jsonString);
