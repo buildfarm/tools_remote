@@ -165,7 +165,6 @@ public class LogParserUtils {
     if (result != null) {
       out.println("ExecuteResponse extracted:");
       out.println(result.toString());
-      out.println("end response");
       return true;
     }
     String errString = error.toString();
