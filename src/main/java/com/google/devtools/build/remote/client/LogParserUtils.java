@@ -18,6 +18,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.RpcCallDetails;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.V1WatchDetails;
@@ -25,6 +26,7 @@ import com.google.devtools.build.remote.client.RemoteClientOptions.PrintLogComma
 import com.google.longrunning.Operation;
 import com.google.longrunning.Operation.ResultCase;
 import com.google.protobuf.Message;
+import com.google.protobuf.util.JsonFormat;
 import com.google.watcher.v1.Change;
 import com.google.watcher.v1.Change.State;
 import com.google.watcher.v1.ChangeBatch;
@@ -40,9 +42,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.InvocationTargetException;
 
 /** Methods for printing log files. */
 public class LogParserUtils {
+
+  private String jsonString;
 
   private static final String DELIMETER =
       "---------------------------------------------------------\n";
@@ -58,6 +66,7 @@ public class LogParserUtils {
 
   public LogParserUtils(String filename) {
     this.filename = filename;
+    this.jsonString = "[";
   }
 
   private FileInputStream openGrpcFileInputStream() throws ParamException, IOException {
@@ -160,6 +169,7 @@ public class LogParserUtils {
     if (result != null) {
       out.println("ExecuteResponse extracted:");
       out.println(result.toString());
+      out.println("end response");
       return true;
     }
     String errString = error.toString();
@@ -220,6 +230,26 @@ public class LogParserUtils {
     }
   }
 
+  private String protobufToJsonEntry(LogEntry input) {
+      String jsonString = "";
+      if (input == null) {
+          throw new RuntimeException("No input provided for parsing");
+      } else {
+          try {
+              jsonString = JsonFormat.printer()
+              .usingTypeRegistry(
+                  JsonFormat.TypeRegistry.newBuilder()
+                      .add(ExecuteOperationMetadata.getDescriptor())
+                      .build())
+                      .print(input);
+          } catch (Exception e) {
+              throw new RuntimeException("Error deserializing protobuf to json", e);
+          }
+      }
+      // We want each entry to have it's own comma
+      return jsonString + ",";
+  }
+
   /**
    * Prints each entry out individually (ungrouped) and a message at the end for how many entries
    * were printed/skipped.
@@ -233,6 +263,23 @@ public class LogParserUtils {
         printLogEntry(entry, out);
         System.out.print(DELIMETER);
       }
+    }
+  }
+
+  /**
+   * Prints each entry out individually (ungrouped) and a message at the end for how many entries
+   * were printed/skipped.
+   */
+  private void printEntriesInJson(OutputStream outStream) throws IOException, ParamException {
+    try (InputStream in = openGrpcFileInputStream()) {
+      PrintWriter out =
+          new PrintWriter(new BufferedWriter(new OutputStreamWriter(outStream, UTF_8)), true);
+      LogEntry entry;
+      while ((entry = LogEntry.parseDelimitedFrom(in)) != null) {
+        jsonString = jsonString.concat(protobufToJsonEntry(entry));
+      }
+      jsonString = jsonString.concat("]");
+      System.out.print(jsonString);
     }
   }
 
@@ -258,9 +305,16 @@ public class LogParserUtils {
   /** Print log entries to standard output according to the command line arguments given. */
   public void printLog(PrintLogCommand options) throws IOException {
     try {
-      if (options.groupByAction) {
+      if (options.groupByAction && options.formatJson){
+        System.err.println("You can't use groupByAction with formatJson");
+      }
+      else if (options.groupByAction){
         printEntriesGroupedByAction(System.out);
-      } else {
+      }
+      else if (options.formatJson) {
+        printEntriesInJson(System.out);
+      }
+      else {
         printEntriesInOrder(System.out);
       }
     } catch (ParamException e) {

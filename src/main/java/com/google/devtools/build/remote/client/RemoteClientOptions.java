@@ -180,6 +180,9 @@ public final class RemoteClientOptions {
                 + "of their call started timestamps (earliest first). Entries without action-id"
                 + "metadata are skipped.")
     public boolean groupByAction;
+
+    @Parameter(names = "--format_json", description = "Print the logs in json format")
+    public boolean formatJson;
   }
 
   @Parameters(
