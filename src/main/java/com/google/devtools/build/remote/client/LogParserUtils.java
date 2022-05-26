@@ -15,6 +15,7 @@
 package com.google.devtools.build.remote.client;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteResponse;
@@ -27,6 +28,7 @@ import com.google.longrunning.Operation;
 import com.google.longrunning.Operation.ResultCase;
 import com.google.protobuf.Message;
 import com.google.protobuf.util.JsonFormat;
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.watcher.v1.Change;
 import com.google.watcher.v1.Change.State;
 import com.google.watcher.v1.ChangeBatch;
@@ -62,7 +64,6 @@ public class LogParserUtils {
 
   public LogParserUtils(String filename) {
     this.filename = filename;
-    this.jsonString = "[";
   }
 
   private FileInputStream openGrpcFileInputStream() throws ParamException, IOException {
@@ -225,24 +226,13 @@ public class LogParserUtils {
     }
   }
 
-  private String protobufToJsonEntry(LogEntry input) {
-      String jsonString = "";
-      if (input == null) {
-          throw new RuntimeException("No input provided for parsing");
-      } else {
-          try {
-              jsonString = JsonFormat.printer()
-              .usingTypeRegistry(
-                  JsonFormat.TypeRegistry.newBuilder()
-                      .add(ExecuteOperationMetadata.getDescriptor())
-                      .build())
-                      .print(input);
-          } catch (Exception e) {
-              throw new RuntimeException("Error deserializing protobuf to json", e);
-          }
-      }
-      // We want each entry to have it's own comma
-      return jsonString;
+  private String protobufToJsonEntry(LogEntry input) throws InvalidProtocolBufferException {
+      return JsonFormat.printer()
+      .usingTypeRegistry(
+      JsonFormat.TypeRegistry.newBuilder()
+        .add(ExecuteOperationMetadata.getDescriptor())
+        .build())
+        .print(checkNotNull(input));
   }
 
   /**
@@ -271,6 +261,7 @@ public class LogParserUtils {
           new PrintWriter(new BufferedWriter(new OutputStreamWriter(outStream, UTF_8)), true);
       LogEntry entry;
       boolean second_entry = false;
+      jsonString = "[";
       while ((entry = LogEntry.parseDelimitedFrom(in)) != null) {
         if(second_entry){
           jsonString = jsonString.concat("," + protobufToJsonEntry(entry));
@@ -280,7 +271,7 @@ public class LogParserUtils {
         second_entry = true;
       }
       jsonString = jsonString.concat("]");
-      System.out.print(jsonString);
+      out.print(jsonString);
     }
   }
 
@@ -306,16 +297,11 @@ public class LogParserUtils {
   /** Print log entries to standard output according to the command line arguments given. */
   public void printLog(PrintLogCommand options) throws IOException {
     try {
-      if (options.groupByAction && options.formatJson){
-        System.err.println("You can't use groupByAction with formatJson");
-      }
-      else if (options.groupByAction){
-        printEntriesGroupedByAction(System.out);
-      }
-      else if (options.formatJson) {
+      if (options.formatJson) {
         printEntriesInJson(System.out);
-      }
-      else {
+      } else if (options.groupByAction){
+        printEntriesGroupedByAction(System.out);
+      } else {
         printEntriesInOrder(System.out);
       }
     } catch (ParamException e) {
