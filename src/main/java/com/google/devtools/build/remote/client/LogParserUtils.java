@@ -226,7 +226,7 @@ public class LogParserUtils {
     }
   }
 
-  private String protobufToJsonEntry(LogEntry input) throws InvalidProtocolBufferException {
+  static String protobufToJsonEntry(LogEntry input) throws InvalidProtocolBufferException {
       return JsonFormat.printer()
       .usingTypeRegistry(
       JsonFormat.TypeRegistry.newBuilder()
@@ -294,10 +294,20 @@ public class LogParserUtils {
     byAction.printByAction(out);
   }
 
+  private void printEntriesGroupedByActionJson(OutputStream outStream)
+      throws IOException, ParamException {
+    ActionGrouping byAction = initActionGrouping();
+    PrintWriter out =
+        new PrintWriter(new BufferedWriter(new OutputStreamWriter(outStream, UTF_8)), true);
+    byAction.printByActionJson(out);
+  }
+
   /** Print log entries to standard output according to the command line arguments given. */
   public void printLog(PrintLogCommand options) throws IOException {
     try {
-      if (options.formatJson) {
+      if (options.formatJson && options.groupByAction){
+        printEntriesGroupedByActionJson(System.out);
+      } else if (options.formatJson) {
         printEntriesInJson(System.out);
       } else if (options.groupByAction){
         printEntriesGroupedByAction(System.out);
