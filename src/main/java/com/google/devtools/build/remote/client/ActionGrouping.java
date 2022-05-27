@@ -153,27 +153,27 @@ final class ActionGrouping {
     }
   }
 
-  void printByActionJson(PrintWriter out) throws IOException {
-    out.println("[");
+  void printByActionJson() throws IOException {
+    System.out.println("[");
     boolean second_method = false;
     for (String hash : actionMap.keySet()) {
       if(second_method) {
-        out.printf(",");
+        System.out.printf(",");
       }
-      out.printf("{\"%s\":", hash);
+      System.out.printf("{\"%s\":", hash);
       boolean second_entry = false;
-      out.printf("[");
+      System.out.printf("[");
       for (LogEntry entry : actionMap.get(hash).getSortedElements()) {
         if(second_entry) {
-          out.printf(",");
+          System.out.printf(",");
         }
-        out.println(LogParserUtils.protobufToJsonEntry(entry));
+        System.out.println(LogParserUtils.protobufToJsonEntry(entry));
         second_entry = true;
       }
-      out.printf("]}");
+      System.out.printf("]}");
       second_method = true;
     }
-    out.println("]");
+    System.out.println("]");
   }
 
   List<Digest> failedActions() throws IOException {

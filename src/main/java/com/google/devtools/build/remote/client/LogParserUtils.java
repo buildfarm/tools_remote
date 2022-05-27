@@ -48,8 +48,6 @@ import java.util.List;
 /** Methods for printing log files. */
 public class LogParserUtils {
 
-  private String jsonString;
-
   private static final String DELIMETER =
       "---------------------------------------------------------\n";
 
@@ -255,23 +253,20 @@ public class LogParserUtils {
    * Prints each entry out individually (ungrouped) and a message at the end for how many entries
    * were printed/skipped.
    */
-  private void printEntriesInJson(OutputStream outStream) throws IOException, ParamException {
+  private void printEntriesInJson() throws IOException, ParamException {
     try (InputStream in = openGrpcFileInputStream()) {
-      PrintWriter out =
-          new PrintWriter(new BufferedWriter(new OutputStreamWriter(outStream, UTF_8)), true);
       LogEntry entry;
       boolean second_entry = false;
-      jsonString = "[";
+      String jsonString = "[";
       while ((entry = LogEntry.parseDelimitedFrom(in)) != null) {
         if(second_entry){
-          jsonString = jsonString.concat("," + protobufToJsonEntry(entry));
-        } else {
-          jsonString = jsonString.concat(protobufToJsonEntry(entry));
+          jsonString = jsonString.concat(",");
         }
+        jsonString = jsonString.concat(protobufToJsonEntry(entry));
         second_entry = true;
       }
       jsonString = jsonString.concat("]");
-      out.print(jsonString);
+      System.out.print(jsonString);
     }
   }
 
@@ -294,21 +289,19 @@ public class LogParserUtils {
     byAction.printByAction(out);
   }
 
-  private void printEntriesGroupedByActionJson(OutputStream outStream)
+  private void printEntriesGroupedByActionJson()
       throws IOException, ParamException {
     ActionGrouping byAction = initActionGrouping();
-    PrintWriter out =
-        new PrintWriter(new BufferedWriter(new OutputStreamWriter(outStream, UTF_8)), true);
-    byAction.printByActionJson(out);
+    byAction.printByActionJson();
   }
 
   /** Print log entries to standard output according to the command line arguments given. */
   public void printLog(PrintLogCommand options) throws IOException {
     try {
       if (options.formatJson && options.groupByAction){
-        printEntriesGroupedByActionJson(System.out);
+        printEntriesGroupedByActionJson();
       } else if (options.formatJson) {
-        printEntriesInJson(System.out);
+        printEntriesInJson();
       } else if (options.groupByAction){
         printEntriesGroupedByAction(System.out);
       } else {
