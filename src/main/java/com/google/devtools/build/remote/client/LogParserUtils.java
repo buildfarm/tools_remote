@@ -44,6 +44,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
 
 /** Methods for printing log files. */
 public class LogParserUtils {
@@ -226,11 +229,11 @@ public class LogParserUtils {
 
   static String protobufToJsonEntry(LogEntry input) throws InvalidProtocolBufferException {
       return JsonFormat.printer()
-      .usingTypeRegistry(
-      JsonFormat.TypeRegistry.newBuilder()
-        .add(ExecuteOperationMetadata.getDescriptor())
-        .build())
-        .print(checkNotNull(input));
+          .usingTypeRegistry(
+              JsonFormat.TypeRegistry.newBuilder()
+              .add(ExecuteOperationMetadata.getDescriptor())
+              .build())
+          .print(checkNotNull(input));
   }
 
   /**
@@ -256,17 +259,13 @@ public class LogParserUtils {
   private void printEntriesInJson() throws IOException, ParamException {
     try (InputStream in = openGrpcFileInputStream()) {
       LogEntry entry;
-      boolean second_entry = false;
-      String jsonString = "[";
+      JSONArray entries = new JSONArray();
       while ((entry = LogEntry.parseDelimitedFrom(in)) != null) {
-        if(second_entry){
-          jsonString = jsonString.concat(",");
-        }
-        jsonString = jsonString.concat(protobufToJsonEntry(entry));
-        second_entry = true;
+        String s = protobufToJsonEntry(entry);
+        Object obj = JSONValue.parse(s);
+        entries.add(obj);
       }
-      jsonString = jsonString.concat("]");
-      System.out.print(jsonString);
+      System.out.print(entries);
     }
   }
 

@@ -15,6 +15,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
 
 /** A class to handle GRPc log grouped by actions */
 final class ActionGrouping {
@@ -154,26 +157,19 @@ final class ActionGrouping {
   }
 
   void printByActionJson() throws IOException {
-    System.out.println("[");
-    boolean second_method = false;
+    JSONArray entries = new JSONArray();
     for (String hash : actionMap.keySet()) {
-      if(second_method) {
-        System.out.printf(",");
-      }
-      System.out.printf("{\"%s\":", hash);
-      boolean second_entry = false;
-      System.out.printf("[");
+      JSONArray actions = new JSONArray();
       for (LogEntry entry : actionMap.get(hash).getSortedElements()) {
-        if(second_entry) {
-          System.out.printf(",");
-        }
-        System.out.println(LogParserUtils.protobufToJsonEntry(entry));
-        second_entry = true;
+        String s = LogParserUtils.protobufToJsonEntry(entry);
+        Object obj = JSONValue.parse(s);
+        actions.add(obj);
       }
-      System.out.printf("]}");
-      second_method = true;
+      JSONObject hash_entry = new JSONObject();
+      hash_entry.put(hash, actions);
+      entries.add(hash_entry);
     }
-    System.out.println("]");
+    System.out.println(entries);
   }
 
   List<Digest> failedActions() throws IOException {
