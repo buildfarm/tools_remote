@@ -15,9 +15,11 @@
 package com.google.devtools.build.remote.client;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.RpcCallDetails;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.V1WatchDetails;
@@ -25,6 +27,8 @@ import com.google.devtools.build.remote.client.RemoteClientOptions.PrintLogComma
 import com.google.longrunning.Operation;
 import com.google.longrunning.Operation.ResultCase;
 import com.google.protobuf.Message;
+import com.google.protobuf.util.JsonFormat;
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.watcher.v1.Change;
 import com.google.watcher.v1.Change.State;
 import com.google.watcher.v1.ChangeBatch;
@@ -40,6 +44,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
 
 /** Methods for printing log files. */
 public class LogParserUtils {
@@ -220,6 +227,15 @@ public class LogParserUtils {
     }
   }
 
+  static String protobufToJsonEntry(LogEntry input) throws InvalidProtocolBufferException {
+      return JsonFormat.printer()
+          .usingTypeRegistry(
+              JsonFormat.TypeRegistry.newBuilder()
+              .add(ExecuteOperationMetadata.getDescriptor())
+              .build())
+          .print(checkNotNull(input));
+  }
+
   /**
    * Prints each entry out individually (ungrouped) and a message at the end for how many entries
    * were printed/skipped.
@@ -233,6 +249,23 @@ public class LogParserUtils {
         printLogEntry(entry, out);
         System.out.print(DELIMETER);
       }
+    }
+  }
+
+  /**
+   * Prints each entry out individually (ungrouped) and a message at the end for how many entries
+   * were printed/skipped.
+   */
+  private void printEntriesInJson() throws IOException, ParamException {
+    try (InputStream in = openGrpcFileInputStream()) {
+      LogEntry entry;
+      JSONArray entries = new JSONArray();
+      while ((entry = LogEntry.parseDelimitedFrom(in)) != null) {
+        String s = protobufToJsonEntry(entry);
+        Object obj = JSONValue.parse(s);
+        entries.add(obj);
+      }
+      System.out.print(entries);
     }
   }
 
@@ -255,10 +288,20 @@ public class LogParserUtils {
     byAction.printByAction(out);
   }
 
+  private void printEntriesGroupedByActionJson()
+      throws IOException, ParamException {
+    ActionGrouping byAction = initActionGrouping();
+    byAction.printByActionJson();
+  }
+
   /** Print log entries to standard output according to the command line arguments given. */
   public void printLog(PrintLogCommand options) throws IOException {
     try {
-      if (options.groupByAction) {
+      if (options.formatJson && options.groupByAction){
+        printEntriesGroupedByActionJson();
+      } else if (options.formatJson) {
+        printEntriesInJson();
+      } else if (options.groupByAction){
         printEntriesGroupedByAction(System.out);
       } else {
         printEntriesInOrder(System.out);

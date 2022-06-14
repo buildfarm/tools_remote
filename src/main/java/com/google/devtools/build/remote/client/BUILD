@@ -16,6 +16,7 @@ java_library(
         "@maven//:com_google_auth_google_auth_library_credentials",
         "@maven//:com_google_auth_google_auth_library_oauth2_http",
         "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_googlecode_json_simple_json_simple",
         "@maven//:com_google_guava_guava",
         "@maven//:io_netty_netty_handler",
         "@googleapis//:google_bytestream_bytestream_java_grpc",

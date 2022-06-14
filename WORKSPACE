@@ -70,6 +70,7 @@ maven_install(
         "com.google.guava:guava:30.1.1-jre",
         "com.google.http-client:google-http-client:1.23.0",
         "com.google.jimfs:jimfs:1.1",
+        "com.googlecode.json-simple:json-simple:1.1.1",
     ] + IO_GRPC_GRPC_JAVA_ARTIFACTS,
     repositories = [
         "https://repo.maven.apache.org/maven2",
