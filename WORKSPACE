@@ -2,8 +2,8 @@ workspace(name = "remote_client")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
-RULES_JVM_EXTERNAL_TAG = "4.2"
-RULES_JVM_EXTERNAL_SHA = "cd1a77b7b02e8e008439ca76fd34f5b07aecb8c752961f9640dea15e9e5ba1ca"
+RULES_JVM_EXTERNAL_TAG = "5.2"
+RULES_JVM_EXTERNAL_SHA = "3824ac95d9edf8465c7a42b7fcb88a5c6b85d2bac0e98b941ba13f235216f313"
 
 http_archive(
     name = "rules_jvm_external",
@@ -14,9 +14,9 @@ http_archive(
 
 http_archive(
     name = "bazel_skylib",
-    sha256 = "9245b0549e88e356cd6a25bf79f97aa19332083890b7ac6481a2affb6ada9752",
-    strip_prefix = "bazel-skylib-0.9.0",
-    url = "https://github.com/bazelbuild/bazel-skylib/archive/0.9.0.tar.gz",
+    sha256 = "060426b186670beede4104095324a72bd7494d8b4e785bf0d84a612978285908",
+    strip_prefix = "bazel-skylib-1.4.1",
+    url = "https://github.com/bazelbuild/bazel-skylib/archive/1.4.1.tar.gz",
 )
 
 http_archive(
@@ -39,9 +39,9 @@ http_archive(
 
 http_archive(
     name = "io_grpc_grpc_java",
-    sha256 = "48b8cb8adee4b2336e9f646e17a10107b1c8de495e1302d28a17b4816d6a20ca",
-    strip_prefix = "grpc-java-1.44.1",
-    urls = ["https://github.com/grpc/grpc-java/archive/v1.44.1.zip"],
+    sha256 = "b1d2db800d3cce5a219ce75433eff3f195245902fd67b15a59e35f459c2ee90a",
+    strip_prefix = "grpc-java-1.55.1",
+    urls = ["https://github.com/grpc/grpc-java/archive/refs/tags/v1.55.1.zip"],
 )
 
 # Bazel toolchains
@@ -67,7 +67,7 @@ load(
 maven_install(
     artifacts = [
         "com.beust:jcommander:1.72",
-        "com.google.guava:guava:30.1.1-jre",
+        "com.google.guava:guava:31.0.1-jre",
         "com.google.http-client:google-http-client:1.23.0",
         "com.google.jimfs:jimfs:1.1",
         "com.googlecode.json-simple:json-simple:1.1.1",
