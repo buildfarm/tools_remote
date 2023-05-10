@@ -64,6 +64,9 @@ load(
     "grpc_java_repositories",
 )
 
+# filter grpc dependencies to specify our own guava version
+GUAVA_PACKAGE_PREFIX = "com.google.guava:guava:"
+
 maven_install(
     artifacts = [
         "com.beust:jcommander:1.72",
@@ -71,7 +74,7 @@ maven_install(
         "com.google.http-client:google-http-client:1.23.0",
         "com.google.jimfs:jimfs:1.1",
         "com.googlecode.json-simple:json-simple:1.1.1",
-    ] + IO_GRPC_GRPC_JAVA_ARTIFACTS,
+    ] + [artifact for artifact in IO_GRPC_GRPC_JAVA_ARTIFACTS if not artifact.startswith(GUAVA_PACKAGE_PREFIX)],
     repositories = [
         "https://repo.maven.apache.org/maven2",
     ],
