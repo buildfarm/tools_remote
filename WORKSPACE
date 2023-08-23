@@ -44,6 +44,13 @@ http_archive(
     urls = ["https://github.com/grpc/grpc-java/archive/refs/tags/v1.55.1.zip"],
 )
 
+http_archive(
+    name = "com_google_protobuf",
+    sha256 = "8bc8612df03c5148f828f762215ee87c9aecca05ed20ef6dffc72ac90bf2c63e",
+    strip_prefix = "protobuf-24.1",
+    urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v24.1/protobuf-24.1.zip"],
+)
+
 # Bazel toolchains
 http_archive(
   name = "bazel_toolchains",
