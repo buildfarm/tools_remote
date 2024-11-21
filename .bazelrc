@@ -1,4 +1,0 @@
-# specify c++14 as a minimum for absl to defy bazel's c++0x default
-# this can be removed once https://github.com/bazelbuild/bazel/pull/18280 is resolved and released
-build --cxxopt=-std=c++14
-build --host_cxxopt=-std=c++14

@@ -22,16 +22,12 @@ import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.RpcCallDetails;
-import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.V1WatchDetails;
 import com.google.devtools.build.remote.client.RemoteClientOptions.PrintLogCommand;
 import com.google.longrunning.Operation;
 import com.google.longrunning.Operation.ResultCase;
 import com.google.protobuf.Message;
 import com.google.protobuf.util.JsonFormat;
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.watcher.v1.Change;
-import com.google.watcher.v1.Change.State;
-import com.google.watcher.v1.ChangeBatch;
 import io.grpc.Status.Code;
 import java.io.BufferedWriter;
 import java.io.FileInputStream;
@@ -87,6 +83,18 @@ public class LogParserUtils {
       return o.getResponse().unpack(t);
     }
     return null;
+  }
+
+  // Returns an ExecuteOperationMetadata contained in the operation and null if none.
+  // If the operation contains an error, returns null and populates StringBuilder "error" with
+  // the error message.
+  public static <T extends Message> T getExecuteMetadata(
+      Operation o, Class<T> t, StringBuilder error) throws IOException {
+    try {
+      return o.getMetadata().unpack(t);
+    } catch (InvalidProtocolBufferException e) {
+      return null;
+    }
   }
 
   // Returns a Digest contained in the log entry, and null if none.
@@ -152,14 +160,6 @@ public class LogParserUtils {
     return Collections.emptyList();
   }
 
-  // Returns true iff the given details contains an entry of V1 API
-  public static boolean isV1Entry(RpcCallDetails details) {
-    return details.hasV1Execute()
-        || details.hasV1FindMissingBlobs()
-        || details.hasV1GetActionResult()
-        || details.hasV1Watch();
-  }
-
   private static <T extends Message> boolean maybePrintOperation(
       Operation o, PrintWriter out, Class<T> t) throws IOException {
     StringBuilder error = new StringBuilder();
@@ -177,25 +177,16 @@ public class LogParserUtils {
     return false;
   }
 
-  /**
-   * Attempt to find and print ExecuteResponse from the details of a log entry for a Watch call. If
-   * no Operation could be found in the Watch call responses, or an Operation was found but failed,
-   * a failure message is printed.
-   */
-  private static void printExecuteResponse(V1WatchDetails watch, PrintWriter out)
-      throws IOException {
-    for (ChangeBatch cb : watch.getResponsesList()) {
-      for (Change ch : cb.getChangesList()) {
-        if (ch.getState() != State.EXISTS) {
-          continue;
-        }
-        Operation o = ch.getData().unpack(Operation.class);
-        maybePrintOperation(
-            o, out, com.google.devtools.remoteexecution.v1test.ExecuteResponse.class);
-        return;
-      }
+  private static <T extends Message> boolean maybePrintMetadata(
+      Operation o, PrintWriter out, Class<T> t) throws IOException {
+    StringBuilder error = new StringBuilder();
+    T result = getExecuteMetadata(o, t, error);
+    if (result != null) {
+      out.println("Metadata extracted:");
+      out.println(result.toString());
+      return true;
     }
-    out.println("Could not find ExecuteResponse in Watch call details.");
+    return false;
   }
 
   /** Print execute responses or errors contained in the given list of operations. */
@@ -203,6 +194,7 @@ public class LogParserUtils {
       throws IOException {
     for (Operation o : operations) {
       maybePrintOperation(o, out, build.bazel.remote.execution.v2.ExecuteResponse.class);
+      maybePrintMetadata(o, out, build.bazel.remote.execution.v2.ExecuteOperationMetadata.class);
     }
   }
   /** Print an individual log entry. */
@@ -210,10 +202,6 @@ public class LogParserUtils {
     out.println(entry.toString());
 
     switch (entry.getDetails().getDetailsCase()) {
-      case V1_WATCH:
-        out.println("\nAttempted to extract ExecuteResponse from Watch call responses:");
-        printExecuteResponse(entry.getDetails().getV1Watch(), out);
-        break;
       case EXECUTE:
         out.println(
             "\nAttempted to extract ExecuteResponse from streaming Execute call responses:");

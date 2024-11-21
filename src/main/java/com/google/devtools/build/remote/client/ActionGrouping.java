@@ -136,11 +136,7 @@ final class ActionGrouping {
 
   private final Map<String, ActionDetails> actionMap;
 
-  // True if found V1 entries in the log.
-  private boolean V1found = false;
-
-  private ActionGrouping(boolean V1found, Map<String, ActionDetails> actionMap) {
-    this.V1found = V1found;
+  private ActionGrouping(Map<String, ActionDetails> actionMap) {
     this.actionMap = actionMap;
   };
 
@@ -173,12 +169,6 @@ final class ActionGrouping {
   }
 
   List<Digest> failedActions() throws IOException {
-    if (V1found) {
-      System.err.println(
-          "This functinality is not supported for V1 API. Please upgrade your Bazel version.");
-      System.exit(1);
-    }
-
     ArrayList<Digest> result = new ArrayList<>();
 
     for (String hash : actionMap.keySet()) {
@@ -198,17 +188,11 @@ final class ActionGrouping {
 
   public static class Builder {
     private Map<String, ActionDetails.Builder> actionMap = new LinkedHashMap<>();
-    // True if found V1 entries in the log.
-    private boolean V1found = false;
 
     // The number of entries skipped
     private int numSkipped = 0;
 
     void addLogEntry(LogEntry entry) throws IOException {
-      if (entry.hasDetails() && LogParserUtils.isV1Entry(entry.getDetails())) {
-        V1found = true;
-      }
-
       if (!entry.hasMetadata()) {
         numSkipped++;
         return;
@@ -237,7 +221,7 @@ final class ActionGrouping {
                       },
                       LinkedHashMap::new));
 
-      return new ActionGrouping(V1found, builtActionMap);
+      return new ActionGrouping(builtActionMap);
     }
   }
 }

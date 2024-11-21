@@ -178,48 +178,6 @@ public class RemoteClient {
     }
   }
 
-  private static Digest toV2(com.google.devtools.remoteexecution.v1test.Digest d)
-      throws IOException {
-    // Digest is binary compatible between v1 and v2
-    return Digest.parseFrom(d.toByteArray());
-  }
-
-  private static Platform toV2(com.google.devtools.remoteexecution.v1test.Platform p)
-      throws IOException {
-    // Platform is binary compatible between v1 and v2
-    return Platform.parseFrom(p.toByteArray());
-  }
-
-  // Output for print action command.
-  private void printActionV1(com.google.devtools.remoteexecution.v1test.Action action, int limit)
-      throws IOException {
-    // Note: Command V2 is backward compatible to V1. It adds fields but does not remove them, so we
-    // can use it here.
-    Command command = getCommand(toV2(action.getCommandDigest()));
-    System.out.printf(
-        "Command [digest: %s]:\n", digestUtil.toString(toV2(action.getCommandDigest())));
-    printCommand(command);
-
-    Tree tree = cache.getTree(toV2(action.getInputRootDigest()));
-    System.out.printf(
-        "\nInput files [total: %d, root Directory digest: %s]:\n",
-        getNumFiles(tree), digestUtil.toString(toV2(action.getInputRootDigest())));
-    listTree(Paths.get(""), tree, limit);
-
-    System.out.println("\nOutput files:");
-    printList(action.getOutputFilesList(), limit);
-
-    System.out.println("\nOutput directories:");
-    printList(action.getOutputDirectoriesList(), limit);
-
-    System.out.println("\nPlatform:");
-    if (action.hasPlatform() && !action.getPlatform().getPropertiesList().isEmpty()) {
-      System.out.println(action.getPlatform().toString());
-    } else {
-      System.out.println("(none)");
-    }
-  }
-
   private Action getAction(Digest actionDigest) throws IOException {
     Action action;
     try {
@@ -238,16 +196,6 @@ public class RemoteClient {
       throw new IOException("Could not obtain Command from digest.", e);
     }
     return command;
-  }
-
-  private static com.google.devtools.remoteexecution.v1test.Action getActionV1FromFile(File file)
-      throws IOException {
-    com.google.devtools.remoteexecution.v1test.Action.Builder builder =
-        com.google.devtools.remoteexecution.v1test.Action.newBuilder();
-    try (FileInputStream fin = new FileInputStream(file)) {
-      TextFormat.getParser().merge(new InputStreamReader(fin), builder);
-    }
-    return builder.build();
   }
 
   // Output for print action command.
@@ -326,38 +274,6 @@ public class RemoteClient {
     } else {
       System.out.println(result.getStdoutRaw().toStringUtf8());
     }
-  }
-
-  // Given a docker run action, sets up a directory for an Action to be run in (download Action
-  // inputs, set up output directories), and display a docker command that will run the Action.
-  private void setupDocker(com.google.devtools.remoteexecution.v1test.Action action, Path root)
-      throws IOException {
-    com.google.devtools.remoteexecution.v1test.Command command;
-    try {
-      command =
-          com.google.devtools.remoteexecution.v1test.Command.parseFrom(
-              cache.downloadBlob(toV2(action.getCommandDigest())));
-    } catch (IOException e) {
-      throw new IOException("Failed to get Command for Action.", e);
-    }
-    Command.Builder builder =
-        Command.newBuilder()
-            .addAllArguments(command.getArgumentsList())
-            .addAllOutputFiles(action.getOutputFilesList())
-            .addAllOutputDirectories(action.getOutputDirectoriesList());
-    for (com.google.devtools.remoteexecution.v1test.Command.EnvironmentVariable var :
-        command.getEnvironmentVariablesList()) {
-      builder.addEnvironmentVariables(
-          Command.EnvironmentVariable.newBuilder()
-              .setName(var.getName())
-              .setValue(var.getValue())
-              .build());
-    }
-    if (action.hasPlatform()) {
-      builder.setPlatform(toV2(action.getPlatform()));
-    }
-
-    setupDocker(builder.build(), toV2(action.getInputRootDigest()), root);
   }
 
   // Given a docker run action, sets up a directory for an Action to be run in (download Action
@@ -480,18 +396,7 @@ public class RemoteClient {
 
   private static void doShowAction(ShowActionCommand options, RemoteClient client)
       throws IOException {
-    if (options.file != null && options.actionDigest != null) {
-      System.err.println("Only one of --file or --action_digest should be specified");
-      System.exit(1);
-    }
-    if (options.file != null) {
-      client.printActionV1(getActionV1FromFile(options.file), options.limit);
-    } else if (options.actionDigest != null) {
-      client.printAction(options.actionDigest, options.limit);
-    } else {
-      System.err.println("Specify --file or --action_digest");
-      System.exit(1);
-    }
+    client.printAction(options.actionDigest, options.limit);
   }
 
   private static void doShowActionResult(ShowActionResultCommand options, RemoteClient client)
@@ -506,13 +411,7 @@ public class RemoteClient {
       throws IOException, ParamException {
     Path path = options.path != null ? options.path : Files.createTempDir().toPath();
 
-    if (options.file != null && options.actionDigest != null) {
-      System.err.println("Only one of --file or --action_digest should be specified");
-      System.exit(1);
-    }
-    if (options.file != null) {
-      client.setupDocker(getActionV1FromFile(options.file), path);
-    } else if (options.actionDigest != null) {
+    if (options.actionDigest != null) {
       client.setupDocker(client.getAction(options.actionDigest), path);
     } else if (!grpcLogFile.isEmpty()) {
       LogParserUtils parser = new LogParserUtils(grpcLogFile);
@@ -531,7 +430,7 @@ public class RemoteClient {
       Digest action = actions.get(0);
       client.setupDocker(client.getAction(action), path);
     } else {
-      System.err.println("Specify --file or --action_digest");
+      System.err.println("Specify --action_digest or --grpc_log");
       System.exit(1);
     }
   }
