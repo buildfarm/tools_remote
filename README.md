@@ -56,7 +56,7 @@ d1c2cad73bf385e1ebc7f7433781a9a5807d425de9426c11d770b5123e5c6a5b/82:
 ### <a name="readlog"></a>Printing gRPC log files
 
 Bazel can dump a log of remote execution related gRPC calls made during a remote build by
-running the remote build with the `--experimental_remote_grpc_log=PATH_TO_LOG` flag specified. This
+running the remote build with the `--remote_grpc_log=PATH_TO_LOG` flag specified. This
 creates a file consisting of serialized log entry protobufs which can be printed by this tool in a
 human-readable way with the `printlog` command:
 
@@ -140,12 +140,7 @@ Docker command:
 
        docker run -u 277174 -v /tmp/run_here:/tmp/run_here-docker -w /tmp/run_here-docker (...)
 
-For V1 API and earlier, the action protos have not been stored in CAS.
-Instead of using action digest, the above commands can use the parameter
---textproto to specify a path to a text proto file containing a V1 action.
-This can be copy-pasted from an Execute call in the grpc log.
-
-For V2 API and later, you can skip specifying the action digest if `grpc_log` is
+You can skip specifying the action digest if `grpc_log` is
 specified. In this case, the tool will scan the log for failed actions. If a
 single failed action is found, it will use that action's digest. If multiple
 failed actions are found, it will print a list of options.
