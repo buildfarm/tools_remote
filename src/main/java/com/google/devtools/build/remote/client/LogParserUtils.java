@@ -17,17 +17,22 @@ package com.google.devtools.build.remote.client;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.LogEntry;
 import com.google.devtools.build.lib.remote.logging.RemoteExecutionLog.RpcCallDetails;
 import com.google.devtools.build.remote.client.RemoteClientOptions.PrintLogCommand;
 import com.google.longrunning.Operation;
 import com.google.longrunning.Operation.ResultCase;
-import com.google.protobuf.Message;
-import com.google.protobuf.util.JsonFormat;
+import com.google.protobuf.Any;
+import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Message;
+import com.google.protobuf.StringValue;
+import com.google.protobuf.util.JsonFormat;
 import io.grpc.Status.Code;
 import java.io.BufferedWriter;
 import java.io.FileInputStream;
@@ -240,6 +245,66 @@ public class LogParserUtils {
     }
   }
 
+  private List<Operation> getResponses(RpcCallDetails details) {
+    switch (details.getDetailsCase()) {
+    case EXECUTE:
+      return details.getExecute().getResponsesList();
+    case WAIT_EXECUTION:
+      return details.getWaitExecution().getResponsesList();
+    }
+    return null;
+  }
+
+  private void filterExecutedActionMetadata(ExecutedActionMetadata.Builder builder) {
+    List<Any> auxiliaryMetadata = new ArrayList<>(builder.getAuxiliaryMetadataList());
+    builder.clearAuxiliaryMetadata();
+    for (Any metadata : auxiliaryMetadata) {
+      builder.addAuxiliaryMetadata(Any.pack(StringValue.newBuilder().setValue(metadata.toString()).build()));
+    }
+  }
+
+  private LogEntry filterUnknownAny(LogEntry entry) throws IOException {
+    ActionResult result;
+    LogEntry.Builder builder = entry.toBuilder();
+    switch (entry.getDetails().getDetailsCase()) {
+      case EXECUTE:
+      case WAIT_EXECUTION:
+        List<Operation> responses = getResponses(entry.getDetails());
+        List<Operation> filteredResponses = new ArrayList<>();
+        for (Operation response : responses) {
+          StringBuilder error = new StringBuilder();
+          ExecuteOperationMetadata metadata = getExecuteMetadata(response, ExecuteOperationMetadata.class, error);
+          Operation.Builder filteredResponse = response.toBuilder();
+          if (metadata != null && metadata.hasPartialExecutionMetadata()) {
+            ExecuteOperationMetadata.Builder metadataBuilder = metadata.toBuilder();
+            filterExecutedActionMetadata(metadataBuilder.getPartialExecutionMetadataBuilder());
+            filteredResponse.setMetadata(Any.pack(metadataBuilder.build()));
+          }
+          ExecuteResponse executeResponse = getExecuteResponse(response, ExecuteResponse.class, error);
+          if (executeResponse != null && executeResponse.getResult().hasExecutionMetadata()) {
+            ExecuteResponse.Builder responseBuilder = executeResponse.toBuilder();
+            filterExecutedActionMetadata(responseBuilder.getResultBuilder().getExecutionMetadataBuilder());
+            filteredResponse.setResponse(Any.pack(responseBuilder.build()));
+          }
+          filteredResponses.add(filteredResponse.build());
+        }
+        switch (entry.getDetails().getDetailsCase()) {
+          case EXECUTE:
+            builder.getDetailsBuilder().getExecuteBuilder().clearResponses().addAllResponses(filteredResponses);
+            break;
+          case WAIT_EXECUTION:
+            builder.getDetailsBuilder().getWaitExecutionBuilder().clearResponses().addAllResponses(filteredResponses);
+            break;
+        }
+        return builder.build();
+      case GET_ACTION_RESULT:
+        ActionResult.Builder resultBuilder = builder.getDetailsBuilder().getGetActionResultBuilder().getResponseBuilder();
+        filterExecutedActionMetadata(resultBuilder.getExecutionMetadataBuilder());
+        return builder.build();
+    }
+    return entry;
+  }
+
   /**
    * Prints each entry out individually (ungrouped) and a message at the end for how many entries
    * were printed/skipped.
@@ -248,7 +313,7 @@ public class LogParserUtils {
     try (InputStream in = openGrpcFileInputStream()) {
       LogEntry entry;
       JSONArray entries = new JSONArray();
-      while ((entry = LogEntry.parseDelimitedFrom(in)) != null) {
+      while ((entry = filterUnknownAny(LogEntry.parseDelimitedFrom(in))) != null) {
         String s = protobufToJsonEntry(entry);
         Object obj = JSONValue.parse(s);
         entries.add(obj);
