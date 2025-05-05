@@ -313,8 +313,8 @@ public class LogParserUtils {
     try (InputStream in = openGrpcFileInputStream()) {
       LogEntry entry;
       JSONArray entries = new JSONArray();
-      while ((entry = filterUnknownAny(LogEntry.parseDelimitedFrom(in))) != null) {
-        String s = protobufToJsonEntry(entry);
+      while ((entry = LogEntry.parseDelimitedFrom(in)) != null) {
+        String s = protobufToJsonEntry(filterUnknownAny(entry));
         Object obj = JSONValue.parse(s);
         entries.add(obj);
       }
