@@ -20,7 +20,7 @@ java_test(
         "@maven//:io_grpc_grpc_core",
         "@maven//:io_grpc_grpc_inprocess",
         "@maven//:io_grpc_grpc_stub",
-        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
+        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
 
@@ -44,7 +44,7 @@ java_test(
         "@maven//:com_google_protobuf_protobuf_java_util",
         "@maven//:com_google_truth_truth",
         "@maven//:io_grpc_grpc_api",
-        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
+        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
 
@@ -55,6 +55,6 @@ java_test(
         "//src/main/java/com/google/devtools/build/remote/client",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_truth_truth",
-        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
+        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )

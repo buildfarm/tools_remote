@@ -8,7 +8,7 @@ proto_library(
         "@googleapis//google/bytestream:bytestream_proto",
         "@googleapis//google/longrunning:operations_proto",
         "@googleapis//google/rpc:status_proto",
-        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_proto",
+        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_proto",
     ],
 )
 
